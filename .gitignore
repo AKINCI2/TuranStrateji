@@ -15,6 +15,10 @@ relay_win.exe
 Packages/com.unity.ai.assistant/
 echo *.zip >> .gitignore
 echo Packages/com.unity.ai.assistant/ >> .gitignore
+echo *.zip >> .gitignore
+echo Packages/com.unity.ai.assistant/ >> .gitignore
+git add .gitignore
+git commit -m "Ignore large package files"
 
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data
