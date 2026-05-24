@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_akinci_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: akinci_timi
+  displayName: Akinci Timi
+  weaponOrVehicleName: MPT-76
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 1
+  rarity: 3
+  weaponData: {fileID: 11400000, guid: d46978a8f30d65b4eac30b7647cc251a, type: 2}
+  visualProfile: {fileID: 11400000, guid: 30d071ae8eb669746b575f9214e9647d, type: 2}
+  branch: 0
+  kind: 0
+  era: 2
+  techLine: piyade
+  baseStars: 4
+  tier: 4
+  mergeResult: {fileID: 11400000, guid: d58da100b66d9934ba4c03d42bd5eaf9, type: 2}
+  mergeRequiredCopies: 3
+  power: 315
+  attack: 60
+  defense: 34
+  health: 220
+  marchSpeed: 4
+  baseSquadSize: 9
+  secondsPerSoldier: 3.1
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 32
+    oil: 4
+    bor: 1

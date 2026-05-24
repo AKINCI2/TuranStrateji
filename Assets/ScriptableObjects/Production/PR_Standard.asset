@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1b4adc3cd530734fba8d07dedb3e3b0, type: 3}
+  m_Name: PR_Standard
+  m_EditorClassIdentifier: Assembly-CSharp::ProductionRecipeData
+  recipes:
+  - type: 0
+    outputAmount: 10
+    seconds: 8
+    cost:
+      gold: 0
+      turanCoin: 0
+      steel: 5
+      oil: 0
+      bor: 0
+  - type: 1
+    outputAmount: 6
+    seconds: 18
+    cost:
+      gold: 0
+      turanCoin: 0
+      steel: 12
+      oil: 2
+      bor: 0
+  - type: 2
+    outputAmount: 4
+    seconds: 32
+    cost:
+      gold: 0
+      turanCoin: 0
+      steel: 18
+      oil: 4
+      bor: 1

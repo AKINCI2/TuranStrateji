@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_turan_altay_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: turan_altay_timi
+  displayName: Turan Altay Timi
+  weaponOrVehicleName: Altay Ileri Modernizasyon
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 0
+  rarity: 3
+  weaponData: {fileID: 11400000, guid: 405ffb1e07b795e49b6502398d1c3c19, type: 2}
+  visualProfile: {fileID: 11400000, guid: 9d64c5c58fee3064f8c32f0ebeb984e0, type: 2}
+  branch: 0
+  kind: 1
+  era: 3
+  techLine: tank
+  baseStars: 5
+  tier: 5
+  mergeResult: {fileID: 11400000, guid: 7a6236c3de10a60499b966fd1be0d95e, type: 2}
+  mergeRequiredCopies: 3
+  power: 820
+  attack: 158
+  defense: 138
+  health: 930
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 3.65
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 150
+    oil: 50
+    bor: 5

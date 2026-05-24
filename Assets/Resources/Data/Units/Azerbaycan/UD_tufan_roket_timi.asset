@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_tufan_roket_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: tufan_roket_timi
+  displayName: Tufan Roket Timi
+  weaponOrVehicleName: Turan-Azerbaycan Roket Sistemi
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 2
+  rarity: 3
+  weaponData: {fileID: 11400000, guid: 5af8f3570efde18469e9eae427abcf2b, type: 2}
+  visualProfile: {fileID: 11400000, guid: 8904bdfdb1bf5c74ca5dc275a93998c5, type: 2}
+  branch: 0
+  kind: 3
+  era: 3
+  techLine: roket
+  baseStars: 5
+  tier: 4
+  mergeResult: {fileID: 0}
+  mergeRequiredCopies: 3
+  power: 735
+  attack: 238
+  defense: 50
+  health: 480
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 3.1
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 120
+    oil: 44
+    bor: 7

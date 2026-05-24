@@ -1,0 +1,29 @@
+{
+  "name": "com.unity.ai.assistant",
+  "displayName": "Assistant",
+  "version": "2.8.0-pre.1",
+  "unity": "6000.0",
+  "description": "Assistant is a generative AI tool integrated into the Unity Editor to explore ideas, answer questions, and perform actions directly in the project. Use natural-language prompts to interact with Assistant in a conversation-based interface. Depending on the mode you choose, Assistant can either provide guidance or take action in your scene and assets.\n\nAsk\nFocuses on explanation and guidance. Assistant answers questions, suggests workflows, and inspects your project using read-only tools without modifying your content.\n\nAgent\nFocuses on action. Assistant can create, modify, or remove objects and assets by calling the Unity Editor tools. All actions respect your permission settings and require approval when needed.\n\nAssistant is designed to be project-aware, helping you work more efficiently without leaving the Unity Editor. It also provides tools for adding generative AI to Unity asset workflows.",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.modules.unitywebrequest": "1.0.0",
+    "com.unity.modules.uielements": "1.0.0",
+    "com.unity.2d.sprite": "1.0.0",
+    "com.unity.cloud.gltfast": "6.14.1",
+    "com.unity.mathematics": "1.3.2"
+  },
+  "unityRelease": "60f1",
+  "_upm": {
+    "changelog": "### Added\n\n- Added description in model selection window when no models are visible.\n- Skills are scanned from UPM package `AIAssistantSkills` folder.\n\n### Changed\n\n- Add Revise plan flow to ExitPlanMode approval card.\n\n### Fixed\n\n- Hide the technical `AttachedImageReference` context entry from the conversation history UI so it no longer appears as a stray widget after domain reload.\n- Implementation plan UI, expanded plan view, and elapsed-time counter no longer disappear or reset when a domain reload happens while the chat is awaiting plan approval.\n- NullReferenceException in Chat Window.\n- Pro license fallback now grants three MCP and AI Gateway connections.\n- Replace additional placeholder .meta file GUIDs that could collide with user projects.\n- Users without an active Unity AI subscription now see the trial banner instead of the \"Get More Credits\" banner across the AI dropdown, Generators, and Assistant.\n- `SKILL.md` files authored in CJK languages (Chinese, Japanese, Korean) now load correctly.\n- Fixed Open Package Manager link not working.\n- Fixed Update button not giving feedback when updating Assistant."
+  },
+  "upmCi": {
+    "footprint": "54cb30fe6e2c28eeb76da9afb08921c9f03c6279"
+  },
+  "documentationUrl": "https://docs.unity3d.com/Packages/com.unity.ai.assistant@2.8/manual/index.html",
+  "repository": {
+    "url": "https://github.cds.internal.unity3d.com/unity/muse-editor.git",
+    "type": "git",
+    "revision": "4837b52f76f629f11f79102fac65184124edc958"
+  },
+  "_fingerprint": "667f49aff9c0152ecb6f78081029b259ffa0ac6c"
+}

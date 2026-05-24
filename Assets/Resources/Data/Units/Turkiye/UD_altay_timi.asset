@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_altay_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: altay_timi
+  displayName: Altay Timi
+  weaponOrVehicleName: Altay AMT
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 1
+  rarity: 3
+  weaponData: {fileID: 11400000, guid: 90ba098298d61924292b5dea766aac46, type: 2}
+  visualProfile: {fileID: 11400000, guid: 339220a4d534cff459c0b5a5bc1770a2, type: 2}
+  branch: 0
+  kind: 1
+  era: 3
+  techLine: tank
+  baseStars: 5
+  tier: 4
+  mergeResult: {fileID: 11400000, guid: 14d67e8ce4927654eb22e1593c43c5dc, type: 2}
+  mergeRequiredCopies: 3
+  power: 660
+  attack: 128
+  defense: 112
+  health: 760
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 3.1
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 120
+    oil: 38
+    bor: 3

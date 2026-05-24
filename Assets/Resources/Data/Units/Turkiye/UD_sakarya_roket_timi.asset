@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_sakarya_roket_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: sakarya_roket_timi
+  displayName: Sakarya Roket Timi
+  weaponOrVehicleName: T-122 Sakarya
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 1
+  rarity: 1
+  weaponData: {fileID: 11400000, guid: b3f28e473a5e76c47b4a28aa2556f1a3, type: 2}
+  visualProfile: {fileID: 11400000, guid: 50142d4ab3a38404ba77cc01415b5b53, type: 2}
+  branch: 0
+  kind: 3
+  era: 2
+  techLine: roket
+  baseStars: 3
+  tier: 2
+  mergeResult: {fileID: 11400000, guid: 9b469c4820d1b774d9bbb8c5d4ac427e, type: 2}
+  mergeRequiredCopies: 3
+  power: 360
+  attack: 115
+  defense: 28
+  health: 260
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 2
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 58
+    oil: 16
+    bor: 0

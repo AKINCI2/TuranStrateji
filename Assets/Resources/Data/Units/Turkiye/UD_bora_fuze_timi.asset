@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_bora_fuze_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: bora_fuze_timi
+  displayName: Bora Fuze Timi
+  weaponOrVehicleName: Bora Taktik Fuze
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 1
+  rarity: 3
+  weaponData: {fileID: 11400000, guid: a94f3cbf3d985b94487eb754d367d430, type: 2}
+  visualProfile: {fileID: 11400000, guid: 6a862deb34ad33c45a4b44cefac6b950, type: 2}
+  branch: 0
+  kind: 3
+  era: 3
+  techLine: roket
+  baseStars: 5
+  tier: 4
+  mergeResult: {fileID: 11400000, guid: 05f0353f544c81b4cbdc33f53fa5dbed, type: 2}
+  mergeRequiredCopies: 3
+  power: 760
+  attack: 245
+  defense: 52
+  health: 500
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 3.1
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 125
+    oil: 46
+    bor: 7

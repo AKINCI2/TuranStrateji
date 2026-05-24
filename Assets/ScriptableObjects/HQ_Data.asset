@@ -1,0 +1,84 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9898f448f11c51c48b2eb077ce1595b6, type: 3}
+  m_Name: HQ_Data
+  m_EditorClassIdentifier: Assembly-CSharp::BuildingData
+  buildingId: building_id
+  displayName: Komuta Merkezi
+  type: 0
+  icon: {fileID: 0}
+  levels:
+  - level: 1
+    visualPrefab: {fileID: 5267877248834166149, guid: 5b07b90ec92746b4fb3042638068c926, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 0
+    powerReward: 0
+    upgradeSeconds: 0
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 0
+      oil: 0
+      bor: 0
+  - level: 2
+    visualPrefab: {fileID: 5267877248834166149, guid: 5b07b90ec92746b4fb3042638068c926, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 1
+    powerReward: 25
+    upgradeSeconds: 5
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 100
+      oil: 50
+      bor: 0
+  - level: 2
+    visualPrefab: {fileID: 5267877248834166149, guid: 5b07b90ec92746b4fb3042638068c926, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 1
+    powerReward: 25
+    upgradeSeconds: 5
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 100
+      oil: 50
+      bor: 0
+  - level: 2
+    visualPrefab: {fileID: 5267877248834166149, guid: 5b07b90ec92746b4fb3042638068c926, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 1
+    powerReward: 25
+    upgradeSeconds: 5
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 100
+      oil: 50
+      bor: 0
+  - level: 2
+    visualPrefab: {fileID: 5267877248834166149, guid: 5b07b90ec92746b4fb3042638068c926, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 1
+    powerReward: 25
+    upgradeSeconds: 5
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 100
+      oil: 50
+      bor: 0

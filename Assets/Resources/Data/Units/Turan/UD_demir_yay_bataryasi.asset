@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_demir_yay_bataryasi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: demir_yay_bataryasi
+  displayName: Demir Yay Bataryasi
+  weaponOrVehicleName: Turan Modern Obus Sistemi
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 0
+  rarity: 3
+  weaponData: {fileID: 11400000, guid: 0c01c40d0da82c244b5d5dc3563df062, type: 2}
+  visualProfile: {fileID: 11400000, guid: 0187db2a9f6e3164a937cd80f0d6b3d2, type: 2}
+  branch: 0
+  kind: 2
+  era: 4
+  techLine: topcu
+  baseStars: 5
+  tier: 5
+  mergeResult: {fileID: 11400000, guid: 69ce62a98a253ff4db342e4bf3909ff4, type: 2}
+  mergeRequiredCopies: 3
+  power: 790
+  attack: 220
+  defense: 70
+  health: 560
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 3.65
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 130
+    oil: 45
+    bor: 7

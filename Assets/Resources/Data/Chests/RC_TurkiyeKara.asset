@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7401acd0bea36d347a93065d56e9c538, type: 3}
+  m_Name: RC_TurkiyeKara
+  m_EditorClassIdentifier: Assembly-CSharp::RewardChestData
+  chestId: turkiye_kara_sandigi
+  displayName: Turkiye Kara Sandigi
+  nation: 1
+  unitRewards:
+  - unitData: {fileID: 11400000, guid: 309c9aa3a79e9b84c8a209a5f9b34471, type: 2}
+    copyAmount: 1
+    weight: 17
+  - unitData: {fileID: 11400000, guid: 572eeebed77245244b375ebfd2b73b33, type: 2}
+    copyAmount: 1
+    weight: 14
+  - unitData: {fileID: 11400000, guid: 6096a011cff43684db0ae4a802dc73e1, type: 2}
+    copyAmount: 1
+    weight: 11
+  - unitData: {fileID: 11400000, guid: 4e1c471c2b678eb478acdd78d13c49d1, type: 2}
+    copyAmount: 1
+    weight: 17
+  - unitData: {fileID: 11400000, guid: 6dcf75d3a74bf734081b689892b7c116, type: 2}
+    copyAmount: 1
+    weight: 17
+  - unitData: {fileID: 11400000, guid: fc311f945c68dc8458b6f1d1d5f9c771, type: 2}
+    copyAmount: 1
+    weight: 14

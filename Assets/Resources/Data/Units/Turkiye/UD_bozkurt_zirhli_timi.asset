@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_bozkurt_zirhli_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: bozkurt_zirhli_timi
+  displayName: Bozkurt Zirhli Timi
+  weaponOrVehicleName: M60 Modernize
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 1
+  rarity: 0
+  weaponData: {fileID: 11400000, guid: efd1785a73bf18545b1d9fb1897376e1, type: 2}
+  visualProfile: {fileID: 11400000, guid: bafdff69db8cdc444a0162dd649e0b6e, type: 2}
+  branch: 0
+  kind: 1
+  era: 1
+  techLine: tank
+  baseStars: 2
+  tier: 1
+  mergeResult: {fileID: 11400000, guid: eb5cb3909101962408bbb67512d88ffa, type: 2}
+  mergeRequiredCopies: 3
+  power: 260
+  attack: 54
+  defense: 45
+  health: 310
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 1.45
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 45
+    oil: 12
+    bor: 0

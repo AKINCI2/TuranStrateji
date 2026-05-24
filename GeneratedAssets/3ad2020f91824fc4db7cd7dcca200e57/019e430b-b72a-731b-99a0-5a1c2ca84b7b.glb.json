@@ -1,0 +1,23 @@
+{
+    "asset": "3ad2020f91824fc4db7cd7dcca200e57",
+    "fileName": "019e430b-b72a-731b-99a0-5a1c2ca84b7b.glb",
+    "prompt": "A military logistics supply truck, low poly stylized, olive green, flat shaded, game asset. 3D model.",
+    "negativePrompt": "",
+    "model": "model3d-tripo-p1",
+    "modelName": "Tripo P1",
+    "customSeed": -1,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation",
+    "promptImageReferenceGuid": "801d991479da44a44b9011161483a67c",
+    "modelReferenceGuid": "",
+    "multiviewFrontGuid": "",
+    "multiviewBackGuid": "",
+    "multiviewLeftGuid": "",
+    "multiviewRightGuid": "",
+    "multiviewTopGuid": "",
+    "multiviewBottomGuid": "",
+    "multiviewLeftFrontGuid": "",
+    "multiviewRightFrontGuid": "",
+    "faceLimit": -1
+}

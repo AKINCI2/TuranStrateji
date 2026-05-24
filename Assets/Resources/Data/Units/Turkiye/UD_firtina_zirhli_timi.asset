@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_firtina_zirhli_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: firtina_zirhli_timi
+  displayName: Firtina Zirhli Timi
+  weaponOrVehicleName: Leopard 2 Modernize
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 1
+  rarity: 2
+  weaponData: {fileID: 11400000, guid: eb96e28a32e1dc24fabbecc78914d32a, type: 2}
+  visualProfile: {fileID: 11400000, guid: 040b955e3ad51f94ea811ef18b4a0f17, type: 2}
+  branch: 0
+  kind: 1
+  era: 2
+  techLine: tank
+  baseStars: 4
+  tier: 3
+  mergeResult: {fileID: 11400000, guid: 9513aff5b6f9c774ba3621d7eed1ee2c, type: 2}
+  mergeRequiredCopies: 3
+  power: 480
+  attack: 94
+  defense: 82
+  health: 560
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 2.55
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 85
+    oil: 26
+    bor: 1

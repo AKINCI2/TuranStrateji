@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10152260a0470c54ebfbef8b2a9ffa19, type: 3}
+  m_Name: UD_kasirga_roket_timi
+  m_EditorClassIdentifier: Assembly-CSharp::TuranUnitData
+  unitId: kasirga_roket_timi
+  displayName: Kasirga Roket Timi
+  weaponOrVehicleName: T-300 Kasirga
+  icon: {fileID: 0}
+  worldPrefab: {fileID: 0}
+  nation: 1
+  rarity: 2
+  weaponData: {fileID: 11400000, guid: e9b2739854a6ee64289247915c94115f, type: 2}
+  visualProfile: {fileID: 11400000, guid: 6281a85d9ef2e044eb64b421ccd08beb, type: 2}
+  branch: 0
+  kind: 3
+  era: 3
+  techLine: roket
+  baseStars: 4
+  tier: 3
+  mergeResult: {fileID: 11400000, guid: afb3eb4f6de889841ba611e9ae9d665b, type: 2}
+  mergeRequiredCopies: 3
+  power: 520
+  attack: 165
+  defense: 38
+  health: 360
+  marchSpeed: 3
+  baseSquadSize: 9
+  secondsPerSoldier: 2.55
+  trainCostPerSoldier:
+    gold: 0
+    turanCoin: 0
+    steel: 82
+    oil: 28
+    bor: 3

@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9898f448f11c51c48b2eb077ce1595b6, type: 3}
+  m_Name: BD_UretimTesisi
+  m_EditorClassIdentifier: Assembly-CSharp::BuildingData
+  buildingId: uretim_tesisi
+  displayName: Uretim Tesisi
+  type: 2
+  icon: {fileID: 0}
+  levels:
+  - level: 1
+    visualPrefab: {fileID: 6182146502183046096, guid: 01fe7af0db4f23340a0daf0c1216fe60, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 1
+    powerReward: 60
+    upgradeSeconds: 0
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 0
+      oil: 0
+      bor: 0
+  - level: 2
+    visualPrefab: {fileID: 6182146502183046096, guid: 01fe7af0db4f23340a0daf0c1216fe60, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 2
+    powerReward: 120
+    upgradeSeconds: 90
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 180
+      oil: 60
+      bor: 8

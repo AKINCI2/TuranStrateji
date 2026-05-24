@@ -1,0 +1,514 @@
+﻿using UnityEngine;
+
+public class WorldBaseMarker : MonoBehaviour
+{
+    [Header("Identity")]
+    public string baseId = "player_main_base";
+
+    [Header("Optional Link")]
+    public BaseBuilding linkedHeadquarters;
+
+    [Header("World Visual")]
+    public bool useHeadquartersVisual = true;
+    public Transform visualRoot;
+    public float worldVisualScale = 1f;
+    public bool autoFitWorldVisual = true;
+    public float targetWorldFootprint = 1.45f;
+    public float worldHexFillRatio = 0.86f;
+    public float minWorldVisualScale = 0.08f;
+    public float maxWorldVisualScale = 40f;
+    public Vector3 worldVisualRotation = Vector3.zero;
+    public bool applyMeshyWorldRotationFix;
+    public Vector3 meshyWorldRotationFix = new Vector3(-90f, 0f, 0f);
+    public Vector3 worldVisualOffset = Vector3.zero;
+    public bool useLiveHeadquartersInSeamlessMode = true;
+    public bool autoCorrectWorldVisualUpright;
+
+    [Header("Placement Rules")]
+    public bool enforcePlacementRules = true;
+    public float markerHeight = 0.15f;
+
+    private GameObject activeVisual;
+    private GameObject activeVisualPrefab;
+    private GameViewMode lastKnownMode = GameViewMode.WorldMap;
+
+    public bool IsPlacementMarker => GetComponent<BaseBuilding>() == null;
+
+    public static WorldBaseMarker FindPrimary(bool includeInactive = false)
+    {
+        WorldBaseMarker[] markers = FindObjectsByType<WorldBaseMarker>(
+            includeInactive ? FindObjectsInactive.Include : FindObjectsInactive.Exclude
+        );
+
+        WorldBaseMarker fallback = null;
+        foreach (WorldBaseMarker marker in markers)
+        {
+            if (marker == null || !marker.IsPlacementMarker)
+                continue;
+
+            if (marker.name.Contains("PlayerBaseMarker"))
+                return marker;
+
+            fallback ??= marker;
+        }
+
+        return fallback;
+    }
+
+    void Awake()
+    {
+        if (!IsPlacementMarker)
+            enabled = false;
+    }
+
+    void Start()
+    {
+        if (!IsPlacementMarker)
+            return;
+
+        EnsureLinkedHeadquarters();
+        ValidatePlacement();
+        if (GameModeManager.Instance != null)
+            lastKnownMode = GameModeManager.Instance.CurrentMode;
+        RefreshWorldVisual();
+    }
+
+    void LateUpdate()
+    {
+        if (!IsPlacementMarker)
+            return;
+
+        if (GameModeManager.Instance == null)
+            return;
+
+        GameViewMode currentMode = GameModeManager.Instance.CurrentMode;
+        if (currentMode == lastKnownMode)
+            return;
+
+        lastKnownMode = currentMode;
+        RefreshWorldVisual();
+    }
+
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        if (Application.isPlaying)
+            return;
+
+        UnityEditor.EditorApplication.delayCall -= RefreshEditorWorldVisual;
+        UnityEditor.EditorApplication.delayCall += RefreshEditorWorldVisual;
+    }
+
+    private void RefreshEditorWorldVisual()
+    {
+        if (this == null || Application.isPlaying)
+            return;
+
+        if (!IsPlacementMarker)
+            return;
+
+        if (UnityEditor.EditorUtility.IsPersistent(this) ||
+            UnityEditor.EditorUtility.IsPersistent(gameObject) ||
+            !gameObject.scene.IsValid())
+        {
+            return;
+        }
+
+        EnsureLinkedHeadquarters();
+        RefreshWorldVisual();
+    }
+#endif
+
+    public bool ValidatePlacement()
+    {
+        if (!enforcePlacementRules)
+            return true;
+
+        HexGridManager grid = FindAnyObjectByType<HexGridManager>();
+        if (grid == null)
+            return true;
+
+        HexCell currentHex = grid.GetClosestHex(transform.position);
+        if (currentHex != null && grid.IsBasePlacementAllowed(currentHex))
+        {
+            SnapToHex(currentHex);
+            return true;
+        }
+
+        HexCell safeHex = grid.GetNearestBasePlacementHex(transform.position);
+        if (safeHex == null)
+            return false;
+
+        SnapToHex(safeHex);
+        return true;
+    }
+
+    private void SnapToHex(HexCell hex)
+    {
+        if (hex == null)
+            return;
+
+        Vector3 position = hex.transform.position;
+        position.y += markerHeight;
+        transform.position = position;
+    }
+
+    public void RefreshWorldVisual()
+    {
+        if (!useHeadquartersVisual)
+            return;
+
+        targetWorldFootprint = GetLevelBasedWorldFootprint();
+        minWorldVisualScale = Mathf.Min(minWorldVisualScale, 0.08f);
+        maxWorldVisualScale = Mathf.Max(maxWorldVisualScale, 40f);
+        applyMeshyWorldRotationFix = false;
+        autoCorrectWorldVisualUpright = false;
+        worldVisualRotation = Vector3.zero;
+
+        EnsureVisualRoot();
+        HidePrimitiveMarkerRenderers();
+
+        if (ShouldUseLiveHeadquartersVisual())
+        {
+            ClearVisualRoot();
+            EnsureClickCollider();
+            return;
+        }
+
+        GameObject visualPrefab = GetCurrentHeadquartersVisualPrefab();
+        if (visualPrefab == null)
+            return;
+
+        if (activeVisual != null && activeVisualPrefab == visualPrefab)
+        {
+            ApplyVisualTransform();
+            EnsureClickCollider();
+            return;
+        }
+
+        ClearVisualRoot();
+        activeVisualPrefab = visualPrefab;
+        activeVisual = Instantiate(visualPrefab, visualRoot);
+        activeVisual.name = visualPrefab.name + "_World";
+        ApplyVisualTransform();
+        DisableVisualColliders();
+        EnsureClickCollider();
+    }
+
+    private void EnsureLinkedHeadquarters()
+    {
+        if (linkedHeadquarters != null)
+            return;
+
+        BaseBuilding[] buildings = FindObjectsByType<BaseBuilding>(FindObjectsInactive.Include);
+        foreach (BaseBuilding building in buildings)
+        {
+            if (building == null || building.data == null)
+                continue;
+
+            if (building.data.type != BuildingType.Headquarters)
+                continue;
+
+            linkedHeadquarters = building;
+            return;
+        }
+    }
+
+    private GameObject GetCurrentHeadquartersVisualPrefab()
+    {
+        if (linkedHeadquarters == null)
+            return null;
+
+        BuildingLevelData levelData = linkedHeadquarters.CurrentLevelData;
+        return levelData != null ? levelData.visualPrefab : null;
+    }
+
+    private bool ShouldUseLiveHeadquartersVisual()
+    {
+        if (!useLiveHeadquartersInSeamlessMode)
+            return false;
+
+        if (linkedHeadquarters == null)
+            return false;
+
+        GameModeManager manager = GameModeManager.Instance;
+        return manager != null &&
+               manager.seamlessWorldBaseMode &&
+               manager.CurrentMode == GameViewMode.BaseView;
+    }
+
+    private void EnsureVisualRoot()
+    {
+        if (visualRoot != null)
+            return;
+
+        Transform existing = transform.Find("WorldBaseVisual");
+        if (existing != null)
+        {
+            visualRoot = existing;
+            return;
+        }
+
+        GameObject root = new GameObject("WorldBaseVisual");
+        root.transform.SetParent(transform, false);
+        visualRoot = root.transform;
+    }
+
+    private void ApplyVisualTransform()
+    {
+        if (activeVisual == null)
+            return;
+
+        activeVisual.transform.localPosition = worldVisualOffset;
+        Quaternion rotation = Quaternion.Euler(worldVisualRotation);
+        if (applyMeshyWorldRotationFix)
+            rotation *= Quaternion.Euler(meshyWorldRotationFix);
+
+        Vector3 scale = Vector3.one * worldVisualScale;
+        BuildingLevelData levelData = linkedHeadquarters != null ? linkedHeadquarters.CurrentLevelData : null;
+        if (levelData != null)
+        {
+            rotation *= Quaternion.Euler(levelData.visualRotation);
+            scale = Vector3.Scale(scale, levelData.visualScale);
+        }
+
+        activeVisual.transform.localRotation = rotation;
+        activeVisual.transform.localScale = scale;
+
+        if (autoCorrectWorldVisualUpright)
+            activeVisual.transform.localRotation = GetBestUprightRotation(activeVisual.transform.localRotation);
+
+        if (autoFitWorldVisual)
+            FitVisualToWorldFootprint();
+    }
+
+    private float GetLevelBasedWorldFootprint()
+    {
+        int level = linkedHeadquarters != null ? Mathf.Max(1, linkedHeadquarters.currentLevel) : 1;
+        int hexStage = 1;
+        if (level >= 20)
+            hexStage = 3;
+        else if (level >= 10)
+            hexStage = 2;
+
+        return GetWorldHexFootprint() * worldHexFillRatio * hexStage;
+    }
+
+    private float GetWorldHexFootprint()
+    {
+        HexGridManager grid = FindAnyObjectByType<HexGridManager>();
+        if (grid != null)
+        {
+            if (grid.allHexCells != null && grid.allHexCells.Count > 0)
+            {
+                HexCell closestHex = grid.GetClosestHex(transform.position);
+                if (closestHex != null)
+                {
+                    float rendererFootprint = GetRendererFootprint(closestHex.gameObject);
+                    if (rendererFootprint > 0.05f)
+                        return rendererFootprint;
+                }
+            }
+
+            return Mathf.Max(1.2f, Mathf.Sqrt(3f) * Mathf.Max(0.1f, grid.size));
+        }
+
+        return 1.7f;
+    }
+
+    private float GetRendererFootprint(GameObject source)
+    {
+        if (source == null)
+            return 0f;
+
+        Renderer[] renderers = source.GetComponentsInChildren<Renderer>(true);
+        if (renderers == null || renderers.Length == 0)
+            return 0f;
+
+        bool hasBounds = false;
+        Bounds bounds = new Bounds(source.transform.position, Vector3.zero);
+
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null || !renderer.enabled)
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (!hasBounds)
+            return 0f;
+
+        return Mathf.Max(bounds.size.x, bounds.size.z);
+    }
+
+    private Quaternion GetBestUprightRotation(Quaternion baseRotation)
+    {
+        Quaternion[] candidates =
+        {
+            Quaternion.identity,
+            Quaternion.Euler(90f, 0f, 0f),
+            Quaternion.Euler(-90f, 0f, 0f),
+            Quaternion.Euler(0f, 0f, 90f),
+            Quaternion.Euler(0f, 0f, -90f)
+        };
+
+        Quaternion bestRotation = baseRotation;
+        float bestScore = float.NegativeInfinity;
+
+        foreach (Quaternion candidate in candidates)
+        {
+            Quaternion testRotation = baseRotation * candidate;
+            activeVisual.transform.localRotation = testRotation;
+
+            if (!TryGetActiveVisualBounds(out Bounds bounds))
+                continue;
+
+            float broadFootprint = Mathf.Max(bounds.size.x, bounds.size.z);
+            float narrowFootprint = Mathf.Min(bounds.size.x, bounds.size.z);
+            float verticalPenalty = bounds.size.y * 1.5f;
+            float score = broadFootprint + narrowFootprint * 2f - verticalPenalty;
+
+            if (score <= bestScore)
+                continue;
+
+            bestScore = score;
+            bestRotation = testRotation;
+        }
+
+        activeVisual.transform.localRotation = bestRotation;
+        return bestRotation;
+    }
+
+    private void FitVisualToWorldFootprint()
+    {
+        if (activeVisual == null || targetWorldFootprint <= 0f)
+            return;
+
+        if (!TryGetActiveVisualBounds(out Bounds bounds))
+            return;
+
+        float currentFootprint = Mathf.Max(bounds.size.x, bounds.size.z);
+        if (currentFootprint <= 0.001f)
+            return;
+
+        float fitMultiplier = targetWorldFootprint / currentFootprint;
+        float fittedScale = Mathf.Clamp(
+            activeVisual.transform.localScale.x * fitMultiplier,
+            minWorldVisualScale,
+            maxWorldVisualScale
+        );
+
+        activeVisual.transform.localScale = Vector3.one * fittedScale;
+    }
+
+    private bool TryGetActiveVisualBounds(out Bounds bounds)
+    {
+        bounds = new Bounds(activeVisual != null ? activeVisual.transform.position : transform.position, Vector3.one);
+        if (activeVisual == null)
+            return false;
+
+        Renderer[] renderers = activeVisual.GetComponentsInChildren<Renderer>(true);
+        if (renderers == null || renderers.Length == 0)
+            return false;
+
+        bool hasBounds = false;
+
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null || !renderer.enabled)
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (!hasBounds)
+            return false;
+
+        return true;
+    }
+
+    private void ClearVisualRoot()
+    {
+        if (visualRoot == null)
+            return;
+
+        for (int i = visualRoot.childCount - 1; i >= 0; i--)
+        {
+            Transform child = visualRoot.GetChild(i);
+            if (child == null)
+                continue;
+
+            if (Application.isPlaying)
+                Destroy(child.gameObject);
+            else
+                DestroyImmediate(child.gameObject);
+        }
+
+        activeVisual = null;
+        activeVisualPrefab = null;
+    }
+
+    private void DisableVisualColliders()
+    {
+        if (activeVisual == null)
+            return;
+
+        Collider[] colliders = activeVisual.GetComponentsInChildren<Collider>(true);
+        foreach (Collider collider in colliders)
+        {
+            if (collider != null)
+                collider.enabled = false;
+        }
+    }
+
+    private void HidePrimitiveMarkerRenderers()
+    {
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null)
+                continue;
+
+            if (visualRoot != null && renderer.transform.IsChildOf(visualRoot))
+                continue;
+
+            string lowerName = renderer.name.ToLowerInvariant();
+            if (lowerName.Contains("cylinder") || lowerName.Contains("marker"))
+                renderer.enabled = false;
+        }
+    }
+
+    private void EnsureClickCollider()
+    {
+        float footprint = Mathf.Max(0.9f, targetWorldFootprint);
+        BoxCollider boxCollider = GetComponent<BoxCollider>();
+        if (boxCollider == null)
+        {
+            boxCollider = gameObject.AddComponent<BoxCollider>();
+            boxCollider.center = new Vector3(0f, 0.35f, 0f);
+            boxCollider.size = new Vector3(footprint, 0.8f, footprint);
+            return;
+        }
+
+        boxCollider.center = new Vector3(0f, 0.35f, 0f);
+        boxCollider.size = new Vector3(footprint, 0.8f, footprint);
+    }
+}
+

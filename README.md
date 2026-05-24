@@ -1,0 +1,2 @@
+# TuranStrateji
+Turan Strateji game
