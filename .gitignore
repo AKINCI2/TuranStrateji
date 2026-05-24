@@ -13,6 +13,8 @@
 *.log
 relay_win.exe
 Packages/com.unity.ai.assistant/
+echo *.zip >> .gitignore
+echo Packages/com.unity.ai.assistant/ >> .gitignore
 
 # MemoryCaptures can get excessive in size.
 # They also could contain extremely sensitive data
