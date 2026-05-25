@@ -20,6 +20,11 @@ public class BarracksBuilding : MonoBehaviour
     public float trainingRemainingSeconds;
     public int trainingSoldierCount;
 
+    [Header("Base Spawn View")]
+    public Transform baseUnitStagingAnchor;
+    public Vector3 baseUnitStagingOffset = new Vector3(0f, 0.03f, 0.55f);
+    public float baseUnitCellSpacing = 0.24f;
+
     private BaseBuilding baseBuilding;
     private float trainingEndTime;
 
@@ -100,6 +105,7 @@ public class BarracksBuilding : MonoBehaviour
     {
         baseBuilding = GetComponent<BaseBuilding>();
         CleanupAssignedUnits();
+        EnsureStagingAnchor();
     }
 
     void Update()
@@ -316,7 +322,7 @@ public class BarracksBuilding : MonoBehaviour
 
         GameModeManager modeManager = GameModeManager.Instance;
         if (modeManager != null)
-            modeManager.EnterWorldMap(true);
+            modeManager.RequestEnterWorldMap(true);
 
         Transform worldParent = modeManager != null ? modeManager.worldUnitsRoot?.transform : null;
         if (worldParent != null)
@@ -349,15 +355,17 @@ public class BarracksBuilding : MonoBehaviour
         if (unit == null || unit.deploymentState != UnitDeploymentState.OnWorldMap || !assignedUnits.Contains(unit))
             return false;
 
-        Transform baseParent = baseBuilding != null && baseBuilding.spawnPointsRoot != null
-            ? baseBuilding.spawnPointsRoot
+        EnsureStagingAnchor();
+
+        Transform baseParent = baseUnitStagingAnchor != null
+            ? baseUnitStagingAnchor
             : transform;
 
         unit.PlaceInBase(baseParent, GetBaseUnitLocalPosition());
         MarkUnitInBase(unit);
 
         if (enterBaseView && GameModeManager.Instance != null)
-            GameModeManager.Instance.EnterBaseView(true);
+            GameModeManager.Instance.RequestEnterBaseView(true);
 
         if (UnitManager.Instance != null)
             UnitManager.Instance.RefreshUnitVisibility(unit);
@@ -412,6 +420,7 @@ public class BarracksBuilding : MonoBehaviour
         UnitController existing = GetFirstUnit(UnitDeploymentState.InBase);
         if (existing != null)
         {
+            existing.RefreshVisualFromData();
             UpdateRepresentativeSoldiers();
             return existing;
         }
@@ -445,11 +454,14 @@ public class BarracksBuilding : MonoBehaviour
         unit.SetUnitData(assignedUnitData);
         unit.assignedBarracks = this;
 
-        Transform baseParent = baseBuilding != null && baseBuilding.spawnPointsRoot != null
-            ? baseBuilding.spawnPointsRoot
+        EnsureStagingAnchor();
+
+        Transform baseParent = baseUnitStagingAnchor != null
+            ? baseUnitStagingAnchor
             : transform;
 
         unit.PlaceInBase(baseParent, GetBaseUnitLocalPosition());
+        unit.RefreshVisualFromData();
 
         if (!assignedUnits.Contains(unit))
             assignedUnits.Add(unit);
@@ -485,6 +497,15 @@ public class BarracksBuilding : MonoBehaviour
 
     private UnitController FindVisualTemplate()
     {
+        if (UnitManager.Instance != null && UnitManager.Instance.units != null)
+        {
+            foreach (UnitController unit in UnitManager.Instance.units)
+            {
+                if (CanUseAsVisualTemplate(unit))
+                    return unit;
+            }
+        }
+
         UnitController[] controllers =
             FindObjectsByType<UnitController>(FindObjectsInactive.Include);
 
@@ -534,9 +555,9 @@ public class BarracksBuilding : MonoBehaviour
     private Vector3 GetBaseUnitLocalPosition()
     {
         int index = Mathf.Max(0, UnitsInBaseCount);
-        float x = (index % 3 - 1) * 0.48f;
-        float z = -0.35f + (index / 3) * 0.48f;
-        return new Vector3(x, 0.03f, z);
+        float x = (index % 3 - 1) * baseUnitCellSpacing;
+        float z = baseUnitStagingOffset.z + (index / 3) * baseUnitCellSpacing;
+        return new Vector3(x + baseUnitStagingOffset.x, baseUnitStagingOffset.y, z);
     }
 
     private bool HasDeployableVisual(UnitController unit)
@@ -573,6 +594,30 @@ public class BarracksBuilding : MonoBehaviour
     private bool IsLogisticsUnit(TuranUnitData unitData)
     {
         return unitData != null && unitData.kind == TuranUnitKind.Logistics;
+    }
+
+    private void EnsureStagingAnchor()
+    {
+        if (baseUnitStagingAnchor != null)
+            return;
+
+        Transform root = baseBuilding != null && baseBuilding.spawnPointsRoot != null
+            ? baseBuilding.spawnPointsRoot
+            : transform;
+
+        Transform existing = root.Find("BarracksUnitStaging");
+        if (existing != null)
+        {
+            baseUnitStagingAnchor = existing;
+            return;
+        }
+
+        GameObject anchor = new GameObject("BarracksUnitStaging");
+        anchor.transform.SetParent(root, false);
+        anchor.transform.localPosition = Vector3.zero;
+        anchor.transform.localRotation = Quaternion.identity;
+        anchor.transform.localScale = Vector3.one;
+        baseUnitStagingAnchor = anchor.transform;
     }
 }
 

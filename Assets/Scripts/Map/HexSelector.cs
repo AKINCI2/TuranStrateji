@@ -33,20 +33,25 @@ public class HexSelector : MonoBehaviour
             return;
         }
 
+        Vector2 pointerPosition;
+        if (!TuranTouchInput.TryGetPrimaryPointerPosition(out pointerPosition))
+            return;
+
         // UI üstündeyken dünya raycast alma
-        if (IsPointerOverUI())
+        if (IsPointerOverUI(pointerPosition))
         {
             return;
         }
 
         // Sol click → hex seç
-        if (Input.GetMouseButtonDown(0))
+        Vector2 tapPosition;
+        if (TuranTouchInput.TryGetPrimaryTapDown(out tapPosition))
         {
-            SelectHex();
+            SelectHex(tapPosition);
         }
     }
 
-    void SelectHex()
+    void SelectHex(Vector2 screenPosition)
     {
         if (cam == null)
             cam = Camera.main;
@@ -54,7 +59,7 @@ public class HexSelector : MonoBehaviour
         if (cam == null)
             return;
 
-        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        Ray ray = cam.ScreenPointToRay(screenPosition);
         RaycastHit hit;
 
         if (Physics.Raycast(ray, out hit, 1000f))
@@ -281,17 +286,17 @@ public class HexSelector : MonoBehaviour
         revealedNeighbors.Clear();
     }
 
-    private bool IsPointerOverUI()
+    private bool IsPointerOverUI(Vector2 pointerPosition)
     {
         if (EventSystem.current == null)
             return false;
 
-        if (Input.touchCount > 0)
-        {
-            return EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId);
-        }
+        PointerEventData pointerData = new PointerEventData(EventSystem.current);
+        pointerData.position = pointerPosition;
 
-        return EventSystem.current.IsPointerOverGameObject();
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(pointerData, results);
+        return results.Count > 0;
     }
 }
 

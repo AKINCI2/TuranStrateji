@@ -31,11 +31,16 @@ public class BuildingSelector : MonoBehaviour
             return;
         }
 
-        if (IsPointerOverBlockingUI())
+        Vector2 pointerPosition;
+        if (!TuranTouchInput.TryGetPrimaryPointerPosition(out pointerPosition))
             return;
 
-        if (Input.GetMouseButtonDown(0))
-            TrySelectBuilding();
+        if (IsPointerOverBlockingUI(pointerPosition))
+            return;
+
+        Vector2 tapPosition;
+        if (TuranTouchInput.TryGetPrimaryTapDown(out tapPosition))
+            TrySelectBuilding(tapPosition);
     }
 
     public void ClearSelection()
@@ -44,7 +49,7 @@ public class BuildingSelector : MonoBehaviour
         SelectionChanged?.Invoke(null);
     }
 
-    void TrySelectBuilding()
+    void TrySelectBuilding(Vector2 screenPosition)
     {
         if (cam == null)
             cam = Camera.main;
@@ -52,7 +57,7 @@ public class BuildingSelector : MonoBehaviour
         if (cam == null)
             return;
 
-        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        Ray ray = cam.ScreenPointToRay(screenPosition);
         RaycastHit[] hits = Physics.RaycastAll(ray, 1500f, ~0, QueryTriggerInteraction.Ignore);
 
         if (hits == null || hits.Length == 0)
@@ -63,34 +68,74 @@ public class BuildingSelector : MonoBehaviour
 
         Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
+        BaseBuilding bestBuilding = null;
+        float bestScore = float.PositiveInfinity;
+
         foreach (RaycastHit hit in hits)
         {
             Collider col = hit.collider;
             if (col == null)
                 continue;
 
-            BaseBuilding building = col.GetComponentInParent<BaseBuilding>();
+            if (IsBaseEnvironmentCollider(col))
+                continue;
+
+            BaseBuilding building = ResolveBuildingFromCollider(col);
             if (building == null)
-            {
-                ClearSelection();
-                return;
-            }
+                continue;
 
             if (!IsSelectableBaseBuilding(building))
-            {
-                ClearSelection();
-                return;
-            }
+                continue;
 
-            selectedBuilding = building;
-            SelectionChanged?.Invoke(selectedBuilding);
-            ShowBuildingPanel(selectedBuilding);
+            float score = ScoreBuildingHit(building, hit);
+            if (score >= bestScore)
+                continue;
 
-            Debug.Log("Bina secildi: " + building.GetDisplayName());
+            bestScore = score;
+            bestBuilding = building;
+        }
+
+        if (bestBuilding == null)
+        {
+            ClearSelection();
             return;
         }
 
-        ClearSelection();
+        selectedBuilding = bestBuilding;
+        SelectionChanged?.Invoke(selectedBuilding);
+        ShowBuildingPanel(selectedBuilding);
+
+        Debug.Log("Bina secildi: " + bestBuilding.GetDisplayName());
+    }
+
+    private BaseBuilding ResolveBuildingFromCollider(Collider col)
+    {
+        if (col == null)
+            return null;
+
+        BuildingClickProxy proxy = col.GetComponent<BuildingClickProxy>();
+        if (proxy != null && proxy.owner != null)
+            return proxy.owner;
+
+        return col.GetComponentInParent<BaseBuilding>();
+    }
+
+    private float ScoreBuildingHit(BaseBuilding building, RaycastHit hit)
+    {
+        if (building == null)
+            return float.PositiveInfinity;
+
+        float distanceScore = hit.distance * 0.35f;
+        float centerScore = Vector2.Distance(
+            new Vector2(hit.point.x, hit.point.z),
+            new Vector2(building.transform.position.x, building.transform.position.z)
+        );
+
+        float proxyBonus = hit.collider != null && hit.collider.GetComponent<BuildingClickProxy>() != null
+            ? -0.65f
+            : 0f;
+
+        return distanceScore + centerScore + proxyBonus;
     }
 
     private bool IsSelectableBaseBuilding(BaseBuilding building)
@@ -153,20 +198,13 @@ public class BuildingSelector : MonoBehaviour
             panel.ForceSelectBuilding(building);
     }
 
-    bool IsPointerOverBlockingUI()
+    bool IsPointerOverBlockingUI(Vector2 pointerPosition)
     {
         if (EventSystem.current == null)
             return false;
 
         PointerEventData pointerData = new PointerEventData(EventSystem.current);
-        if (Input.touchCount > 0)
-        {
-            pointerData.position = Input.GetTouch(0).position;
-        }
-        else
-        {
-            pointerData.position = Input.mousePosition;
-        }
+        pointerData.position = pointerPosition;
 
         List<RaycastResult> results = new List<RaycastResult>();
         EventSystem.current.RaycastAll(pointerData, results);

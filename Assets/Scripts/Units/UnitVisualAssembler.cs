@@ -11,12 +11,18 @@ public class UnitVisualAssembler : MonoBehaviour
     public void Assemble(TuranUnitData unitData)
     {
         if (unitData == null || unitData.visualProfile == null)
+        {
+            EnsureExistingChildrenVisible();
             return;
+        }
 
         UnitVisualProfile profile = unitData.visualProfile;
         GameObject characterPrefab = profile.characterPrefab;
         if (characterPrefab == null)
+        {
+            EnsureExistingChildrenVisible();
             return;
+        }
 
         Clear();
         RemoveLegacyPlaceholderChildren();
@@ -127,5 +133,25 @@ public class UnitVisualAssembler : MonoBehaviour
 
             Destroy(child.gameObject);
         }
+    }
+
+    public void EnsureExistingChildrenVisible()
+    {
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            SetHierarchyActive(child, true);
+        }
+    }
+
+    private void SetHierarchyActive(Transform root, bool active)
+    {
+        if (root == null)
+            return;
+
+        root.gameObject.SetActive(active);
+
+        for (int i = 0; i < root.childCount; i++)
+            SetHierarchyActive(root.GetChild(i), active);
     }
 }

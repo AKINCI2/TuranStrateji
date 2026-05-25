@@ -5,9 +5,13 @@ public class HexGridManager : MonoBehaviour
 {
     [Header("Grid Settings")]
     public GameObject hexPrefab;
-    public int width = 20;
-    public int height = 20;
+    public int width = 72;
+    public int height = 72;
     public float size = 1f;
+    public bool autoApplyMobileWorldPreset = true;
+    public int mobilePresetWidth = 72;
+    public int mobilePresetHeight = 72;
+    public float mobilePresetHexSize = 1f;
 
     [Header("World Generation")]
     public bool generateWorldTerrain = true;
@@ -30,6 +34,7 @@ public class HexGridManager : MonoBehaviour
     void Awake()
     {
         showDebugLogs = false;
+        ApplyMobilePresetIfNeeded();
     }
 
     void Start()
@@ -42,6 +47,22 @@ public class HexGridManager : MonoBehaviour
 
         EnsureTerrainCover();
         EnsureSampleCities();
+    }
+
+    private void ApplyMobilePresetIfNeeded()
+    {
+        if (!autoApplyMobileWorldPreset)
+            return;
+
+        width = Mathf.Max(width, mobilePresetWidth);
+        height = Mathf.Max(height, mobilePresetHeight);
+        size = Mathf.Max(0.65f, mobilePresetHexSize);
+
+        riverCenterColumn = Mathf.Clamp(Mathf.RoundToInt(width * 0.5f), 2, width - 3);
+        riverWidth = Mathf.Clamp(riverWidth, 1, 3);
+
+        if (terrainSeed == 0)
+            terrainSeed = 1453;
     }
 
     void GenerateGrid()

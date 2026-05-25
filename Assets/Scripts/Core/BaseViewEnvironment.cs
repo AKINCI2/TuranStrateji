@@ -115,9 +115,9 @@ public class BaseViewEnvironment : MonoBehaviour
     {
         float size = GetCurrentFoundationSize();
         float half = size * 0.5f;
-        float wallThickness = Mathf.Clamp(size * 0.055f, 0.28f, 0.48f);
-        float wallHeight = Mathf.Clamp(size * 0.105f, 0.72f, 1.35f);
-        float towerRadius = Mathf.Clamp(size * 0.092f, 0.62f, 1.35f);
+        float wallThickness = Mathf.Clamp(size * 0.04f, 0.055f, 0.30f);
+        float wallHeight = Mathf.Clamp(size * 0.065f, 0.10f, 0.72f);
+        float towerRadius = Mathf.Clamp(size * 0.075f, 0.10f, 0.72f);
         float towerHeight = wallHeight * 1.45f;
 
         CreateQuad(
@@ -130,16 +130,18 @@ public class BaseViewEnvironment : MonoBehaviour
             foundationAccentColor
         );
 
-        float wallOffset = half + wallThickness * 0.5f;
-        CreateBox(parent, "BaseWall_North", new Vector3(size + wallThickness * 2f, wallHeight, wallThickness), new Vector3(0f, wallHeight * 0.5f, wallOffset), wallColor, foundationAccentColor);
-        CreateBox(parent, "BaseWall_South", new Vector3(size + wallThickness * 2f, wallHeight, wallThickness), new Vector3(0f, wallHeight * 0.5f, -wallOffset), wallColor, foundationAccentColor);
-        CreateBox(parent, "BaseWall_East", new Vector3(wallThickness, wallHeight, size), new Vector3(wallOffset, wallHeight * 0.5f, 0f), wallColor, foundationAccentColor);
-        CreateBox(parent, "BaseWall_West", new Vector3(wallThickness, wallHeight, size), new Vector3(-wallOffset, wallHeight * 0.5f, 0f), wallColor, foundationAccentColor);
+        float wallOffset = half - wallThickness * 0.5f;
+        float wallSpan = Mathf.Max(0.1f, size - wallThickness * 2f);
+        CreateBox(parent, "BaseWall_North", new Vector3(wallSpan, wallHeight, wallThickness), new Vector3(0f, wallHeight * 0.5f, wallOffset), wallColor, foundationAccentColor);
+        CreateBox(parent, "BaseWall_South", new Vector3(wallSpan, wallHeight, wallThickness), new Vector3(0f, wallHeight * 0.5f, -wallOffset), wallColor, foundationAccentColor);
+        CreateBox(parent, "BaseWall_East", new Vector3(wallThickness, wallHeight, wallSpan), new Vector3(wallOffset, wallHeight * 0.5f, 0f), wallColor, foundationAccentColor);
+        CreateBox(parent, "BaseWall_West", new Vector3(wallThickness, wallHeight, wallSpan), new Vector3(-wallOffset, wallHeight * 0.5f, 0f), wallColor, foundationAccentColor);
 
-        CreateOctagonalTower(parent, "WatchTower_NE", new Vector3(wallOffset, towerHeight * 0.5f, wallOffset), towerRadius, towerHeight);
-        CreateOctagonalTower(parent, "WatchTower_NW", new Vector3(-wallOffset, towerHeight * 0.5f, wallOffset), towerRadius, towerHeight);
-        CreateOctagonalTower(parent, "WatchTower_SE", new Vector3(wallOffset, towerHeight * 0.5f, -wallOffset), towerRadius, towerHeight);
-        CreateOctagonalTower(parent, "WatchTower_SW", new Vector3(-wallOffset, towerHeight * 0.5f, -wallOffset), towerRadius, towerHeight);
+        float towerOffset = half - towerRadius;
+        CreateOctagonalTower(parent, "WatchTower_NE", new Vector3(towerOffset, towerHeight * 0.5f, towerOffset), towerRadius, towerHeight);
+        CreateOctagonalTower(parent, "WatchTower_NW", new Vector3(-towerOffset, towerHeight * 0.5f, towerOffset), towerRadius, towerHeight);
+        CreateOctagonalTower(parent, "WatchTower_SE", new Vector3(towerOffset, towerHeight * 0.5f, -towerOffset), towerRadius, towerHeight);
+        CreateOctagonalTower(parent, "WatchTower_SW", new Vector3(-towerOffset, towerHeight * 0.5f, -towerOffset), towerRadius, towerHeight);
     }
 
     private float GetCurrentFoundationSize()
@@ -181,6 +183,9 @@ public class BaseViewEnvironment : MonoBehaviour
 
     private void HideLegacySurfaces()
     {
+        float baseFootprint = GetCurrentFoundationSize();
+        float maxAllowedSpan = Mathf.Max(2f, baseFootprint * 1.35f);
+
         for (int i = 0; i < transform.childCount; i++)
         {
             Transform child = transform.GetChild(i);
@@ -209,6 +214,10 @@ public class BaseViewEnvironment : MonoBehaviour
                     bounds.size.x > 1.8f &&
                     bounds.size.z > 1.8f;
 
+                bool tooLargeForBase =
+                    bounds.size.x > maxAllowedSpan ||
+                    bounds.size.z > maxAllowedSpan;
+
                 string lowerName = renderer.name.ToLowerInvariant();
                 bool namedLikeSurface =
                     lowerName.Contains("usici") ||
@@ -219,7 +228,7 @@ public class BaseViewEnvironment : MonoBehaviour
                     lowerName.Contains("pad") ||
                     lowerName.Contains("floor");
 
-                if (looksLikeBaseSurface || namedLikeSurface)
+                if (looksLikeBaseSurface || namedLikeSurface || tooLargeForBase)
                 {
                     renderer.enabled = false;
                     Collider collider = renderer.GetComponent<Collider>();

@@ -4,27 +4,27 @@ using UnityEngine;
 public class WorldTerrainCover : MonoBehaviour
 {
     [Header("Look")]
-    public Color grassColor = new Color(0.32f, 0.47f, 0.27f, 1f);
-    public Color grassDarkColor = new Color(0.22f, 0.34f, 0.20f, 1f);
-    public Color waterColor = new Color(0.12f, 0.34f, 0.50f, 0.92f);
-    public Color roadColor = new Color(0.47f, 0.39f, 0.25f, 0.78f);
-    public Color forestColor = new Color(0.13f, 0.24f, 0.12f, 0.55f);
-    public Color mountainColor = new Color(0.31f, 0.30f, 0.27f, 0.48f);
-    public Color shorelineColor = new Color(0.48f, 0.42f, 0.28f, 0.34f);
+    public Color grassColor = new Color(0.27f, 0.43f, 0.24f, 1f);
+    public Color grassDarkColor = new Color(0.17f, 0.30f, 0.16f, 1f);
+    public Color waterColor = new Color(0.10f, 0.28f, 0.44f, 0.93f);
+    public Color roadColor = new Color(0.41f, 0.34f, 0.22f, 0.82f);
+    public Color forestColor = new Color(0.10f, 0.20f, 0.10f, 0.58f);
+    public Color mountainColor = new Color(0.30f, 0.29f, 0.27f, 0.55f);
+    public Color shorelineColor = new Color(0.56f, 0.49f, 0.33f, 0.42f);
     public Color treeTrunkColor = new Color(0.22f, 0.15f, 0.09f, 1f);
     public Color treeCanopyColor = new Color(0.10f, 0.24f, 0.10f, 1f);
     public Color rockPropColor = new Color(0.34f, 0.33f, 0.30f, 1f);
-    public int textureSize = 256;
-    public float groundTextureMeters = 7f;
+    public int textureSize = 1024;
+    public float groundTextureMeters = 3.8f;
 
     [Header("Scale")]
-    public float surfaceY = 0.035f;
-    public float featureY = 0.052f;
-    public float padding = 4f;
-    public float waterWidth = 2.4f;
-    public float roadWidth = 0.55f;
-    public int maxForestPropCells = 120;
-    public int maxMountainPropCells = 70;
+    public float surfaceY = 0.03f;
+    public float featureY = 0.05f;
+    public float padding = 7f;
+    public float waterWidth = 2.7f;
+    public float roadWidth = 0.56f;
+    public int maxForestPropCells = 180;
+    public int maxMountainPropCells = 120;
 
     [Header("Prefab Pipeline")]
     public GameObject[] treePrefabs;

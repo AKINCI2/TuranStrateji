@@ -56,6 +56,7 @@ MonoBehaviour:
   uiAnchor: {fileID: 865524182902794066}
   useRootClickColliderOnly: 1
   autoFitClickCollider: 0
+  useDedicatedClickProxy: 1
   isUpgrading: 0
   upgradeRemainingSeconds: 0
 --- !u!114 &8923450782022230619

@@ -312,6 +312,13 @@ public class BaseConstructionManager : MonoBehaviour
         if (building == null)
             return;
 
+        GameModeManager modeManager = GameModeManager.Instance != null
+            ? GameModeManager.Instance
+            : FindAnyObjectByType<GameModeManager>();
+
+        if (building.data != null && modeManager != null)
+            building.FitVisualToFootprint(modeManager.GetSuggestedBuildingFootprint(building.data.type));
+
         building.RebuildClickableCollider();
     }
 
@@ -348,27 +355,40 @@ public class BaseConstructionManager : MonoBehaviour
 
     private Vector3 GetDefaultSlotPosition(string slotId, BuildingType type)
     {
+        float multiplier = GetBaseLayoutMultiplier();
+
         switch (slotId)
         {
             case "slot_barracks_01":
-                return new Vector3(-2.65f, 0f, -2.35f);
+                return new Vector3(-2.65f * multiplier, 0f, -2.35f * multiplier);
             case "slot_production_01":
-                return new Vector3(2.65f, 0f, -2.35f);
+                return new Vector3(2.65f * multiplier, 0f, -2.35f * multiplier);
             case "slot_barracks_02":
-                return new Vector3(-4.2f, 0f, -3.9f);
+                return new Vector3(-4.2f * multiplier, 0f, -3.9f * multiplier);
             case "slot_research_01":
-                return new Vector3(4.2f, 0f, -3.9f);
+                return new Vector3(4.2f * multiplier, 0f, -3.9f * multiplier);
             case "slot_warehouse_01":
-                return new Vector3(0f, 0f, -4.45f);
+                return new Vector3(0f, 0f, -4.45f * multiplier);
         }
 
         if (type == BuildingType.Barracks)
-            return new Vector3(-2.65f, 0f, -2.35f);
+            return new Vector3(-2.65f * multiplier, 0f, -2.35f * multiplier);
 
         if (type == BuildingType.ProductionFacility)
-            return new Vector3(2.65f, 0f, -2.35f);
+            return new Vector3(2.65f * multiplier, 0f, -2.35f * multiplier);
 
-        return new Vector3(0f, 0f, -3f);
+        return new Vector3(0f, 0f, -3f * multiplier);
+    }
+
+    private float GetBaseLayoutMultiplier()
+    {
+        GameModeManager modeManager = GameModeManager.Instance != null
+            ? GameModeManager.Instance
+            : FindAnyObjectByType<GameModeManager>();
+
+        return modeManager != null
+            ? modeManager.GetCurrentBaseLayoutMultiplier()
+            : 0.22f;
     }
 
     private void CreateSlot(Transform root, string id, BuildingType type, Vector3 localPosition, int requiredLevel)

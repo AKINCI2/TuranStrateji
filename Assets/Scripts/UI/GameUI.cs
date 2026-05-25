@@ -203,7 +203,7 @@ public class GameUI : MonoBehaviour
         {
             GameModeManager modeManager = GameModeManager.Instance;
             if (modeManager != null)
-                modeManager.EnterWorldMap(true);
+                modeManager.RequestEnterWorldMap(true);
 
             Transform worldParent = modeManager != null ? modeManager.worldUnitsRoot?.transform : null;
             if (worldParent != null)
@@ -236,18 +236,18 @@ public class GameUI : MonoBehaviour
     public void OnEnterBasePressed()
     {
         if (worldBaseSelector != null) worldBaseSelector.ClearSelection();
-        if (gameMode != null) gameMode.EnterBaseView(true);
+        if (gameMode != null) gameMode.RequestEnterBaseView(true);
     }
 
     public void OnBackToMapPressed()
     {
-        if (gameMode != null) gameMode.EnterWorldMap(true);
+        if (gameMode != null) gameMode.RequestEnterWorldMap(true);
     }
 
     public void OnRecallUnitsPressed()
     {
         if (gameMode != null)
-            gameMode.EnterWorldMap(true);
+            gameMode.RequestEnterWorldMap(true);
 
         if (UnitManager.Instance != null) UnitManager.Instance.RecallAllWorldUnitsToBase();
         if (worldBaseSelector != null) worldBaseSelector.ClearSelection();

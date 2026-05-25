@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -31,11 +32,16 @@ public class WorldBaseSelector : MonoBehaviour
             return;
         }
 
-        if (IsPointerOverUI())
+        Vector2 pointerPosition;
+        if (!TuranTouchInput.TryGetPrimaryPointerPosition(out pointerPosition))
             return;
 
-        if (Input.GetMouseButtonDown(0))
-            TrySelectMarker();
+        if (IsPointerOverUI(pointerPosition))
+            return;
+
+        Vector2 tapPosition;
+        if (TuranTouchInput.TryGetPrimaryTapDown(out tapPosition))
+            TrySelectMarker(tapPosition);
     }
 
     public void ClearSelection()
@@ -44,7 +50,7 @@ public class WorldBaseSelector : MonoBehaviour
         SelectionChanged?.Invoke(null);
     }
 
-    private void TrySelectMarker()
+    private void TrySelectMarker(Vector2 screenPosition)
     {
         if (cam == null)
             cam = Camera.main;
@@ -52,8 +58,8 @@ public class WorldBaseSelector : MonoBehaviour
         if (cam == null)
             return;
 
-        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
-        RaycastHit[] hits = Physics.RaycastAll(ray, 1000f);
+        Ray ray = cam.ScreenPointToRay(screenPosition);
+        RaycastHit[] hits = Physics.RaycastAll(ray, 1000f, ~0, QueryTriggerInteraction.Ignore);
 
         if (hits == null || hits.Length == 0)
         {
@@ -64,17 +70,15 @@ public class WorldBaseSelector : MonoBehaviour
             return;
         }
 
-        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
         for (int i = 0; i < hits.Length; i++)
         {
-            WorldBaseMarker marker =
-                hits[i].collider.GetComponentInParent<WorldBaseMarker>();
+            WorldBaseMarker marker = hits[i].collider != null
+                ? hits[i].collider.GetComponentInParent<WorldBaseMarker>()
+                : null;
 
-            if (marker == null)
-                continue;
-
-            if (!marker.IsPlacementMarker)
+            if (marker == null || !marker.IsPlacementMarker)
                 continue;
 
             selectedMarker = marker;
@@ -86,20 +90,21 @@ public class WorldBaseSelector : MonoBehaviour
         }
 
         if (debugLogs)
-            Debug.Log("WorldBaseSelector: Raycast var ama WorldBaseMarker yok. Ilk hit: " + hits[0].collider.name);
+            Debug.Log("WorldBaseSelector: Raycast var ama WorldBaseMarker yok.");
 
         ClearSelection();
     }
 
-    private bool IsPointerOverUI()
+    private bool IsPointerOverUI(Vector2 pointerPosition)
     {
         if (EventSystem.current == null)
             return false;
 
-        if (Input.touchCount > 0)
-            return EventSystem.current.IsPointerOverGameObject(Input.GetTouch(0).fingerId);
+        PointerEventData pointerData = new PointerEventData(EventSystem.current);
+        pointerData.position = pointerPosition;
 
-        return EventSystem.current.IsPointerOverGameObject();
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(pointerData, results);
+        return results.Count > 0;
     }
 }
-

@@ -14,15 +14,21 @@ public class WorldBaseMarker : MonoBehaviour
     public float worldVisualScale = 1f;
     public bool autoFitWorldVisual = true;
     public float targetWorldFootprint = 1.45f;
-    public float worldHexFillRatio = 0.86f;
+    public float worldHexFillRatio = 0.94f;
     public float minWorldVisualScale = 0.08f;
-    public float maxWorldVisualScale = 40f;
+    public float maxWorldVisualScale = 8f;
     public Vector3 worldVisualRotation = Vector3.zero;
-    public bool applyMeshyWorldRotationFix;
+    public bool applyMeshyWorldRotationFix = true;
     public Vector3 meshyWorldRotationFix = new Vector3(-90f, 0f, 0f);
     public Vector3 worldVisualOffset = Vector3.zero;
     public bool useLiveHeadquartersInSeamlessMode = true;
-    public bool autoCorrectWorldVisualUpright;
+    public bool autoCorrectWorldVisualUpright = true;
+    public bool showWorldFortWalls = true;
+    public Color worldFortWallColor = new Color(0.19f, 0.19f, 0.2f, 1f);
+    [Range(0.04f, 0.35f)]
+    public float worldFortWallThickness = 0.11f;
+    [Range(0.06f, 0.8f)]
+    public float worldFortWallHeight = 0.2f;
 
     [Header("Placement Rules")]
     public bool enforcePlacementRules = true;
@@ -30,6 +36,7 @@ public class WorldBaseMarker : MonoBehaviour
 
     private GameObject activeVisual;
     private GameObject activeVisualPrefab;
+    private Transform worldFortRoot;
     private GameViewMode lastKnownMode = GameViewMode.WorldMap;
 
     public bool IsPlacementMarker => GetComponent<BaseBuilding>() == null;
@@ -158,12 +165,13 @@ public class WorldBaseMarker : MonoBehaviour
         if (!useHeadquartersVisual)
             return;
 
+        worldHexFillRatio = Mathf.Clamp(worldHexFillRatio, 0.9f, 1f);
         targetWorldFootprint = GetLevelBasedWorldFootprint();
         minWorldVisualScale = Mathf.Min(minWorldVisualScale, 0.08f);
-        maxWorldVisualScale = Mathf.Max(maxWorldVisualScale, 40f);
-        applyMeshyWorldRotationFix = false;
-        autoCorrectWorldVisualUpright = false;
+        maxWorldVisualScale = Mathf.Clamp(maxWorldVisualScale, 1f, 8f);
+        autoCorrectWorldVisualUpright = true;
         worldVisualRotation = Vector3.zero;
+        transform.rotation = Quaternion.identity;
 
         EnsureVisualRoot();
         HidePrimitiveMarkerRenderers();
@@ -171,6 +179,7 @@ public class WorldBaseMarker : MonoBehaviour
         if (ShouldUseLiveHeadquartersVisual())
         {
             ClearVisualRoot();
+            ClearWorldFortWalls();
             EnsureClickCollider();
             return;
         }
@@ -182,6 +191,7 @@ public class WorldBaseMarker : MonoBehaviour
         if (activeVisual != null && activeVisualPrefab == visualPrefab)
         {
             ApplyVisualTransform();
+            RebuildWorldFortWalls();
             EnsureClickCollider();
             return;
         }
@@ -192,6 +202,7 @@ public class WorldBaseMarker : MonoBehaviour
         activeVisual.name = visualPrefab.name + "_World";
         ApplyVisualTransform();
         DisableVisualColliders();
+        RebuildWorldFortWalls();
         EnsureClickCollider();
     }
 
@@ -246,11 +257,17 @@ public class WorldBaseMarker : MonoBehaviour
         if (existing != null)
         {
             visualRoot = existing;
+            visualRoot.localPosition = Vector3.zero;
+            visualRoot.localRotation = Quaternion.identity;
+            visualRoot.localScale = Vector3.one;
             return;
         }
 
         GameObject root = new GameObject("WorldBaseVisual");
         root.transform.SetParent(transform, false);
+        root.transform.localPosition = Vector3.zero;
+        root.transform.localRotation = Quaternion.identity;
+        root.transform.localScale = Vector3.one;
         visualRoot = root.transform;
     }
 
@@ -284,14 +301,7 @@ public class WorldBaseMarker : MonoBehaviour
 
     private float GetLevelBasedWorldFootprint()
     {
-        int level = linkedHeadquarters != null ? Mathf.Max(1, linkedHeadquarters.currentLevel) : 1;
-        int hexStage = 1;
-        if (level >= 20)
-            hexStage = 3;
-        else if (level >= 10)
-            hexStage = 2;
-
-        return GetWorldHexFootprint() * worldHexFillRatio * hexStage;
+        return GetWorldHexFootprint() * worldHexFillRatio;
     }
 
     private float GetWorldHexFootprint()
@@ -358,7 +368,11 @@ public class WorldBaseMarker : MonoBehaviour
             Quaternion.Euler(90f, 0f, 0f),
             Quaternion.Euler(-90f, 0f, 0f),
             Quaternion.Euler(0f, 0f, 90f),
-            Quaternion.Euler(0f, 0f, -90f)
+            Quaternion.Euler(0f, 0f, -90f),
+            Quaternion.Euler(90f, 180f, 0f),
+            Quaternion.Euler(-90f, 180f, 0f),
+            Quaternion.Euler(0f, 180f, 90f),
+            Quaternion.Euler(0f, 180f, -90f)
         };
 
         Quaternion bestRotation = baseRotation;
@@ -374,8 +388,14 @@ public class WorldBaseMarker : MonoBehaviour
 
             float broadFootprint = Mathf.Max(bounds.size.x, bounds.size.z);
             float narrowFootprint = Mathf.Min(bounds.size.x, bounds.size.z);
-            float verticalPenalty = bounds.size.y * 1.5f;
-            float score = broadFootprint + narrowFootprint * 2f - verticalPenalty;
+            float heightRatio = bounds.size.y / Mathf.Max(0.001f, broadFootprint);
+            float squareness = narrowFootprint / Mathf.Max(0.001f, broadFootprint);
+            float targetPenalty = Mathf.Abs(broadFootprint - targetWorldFootprint) / Mathf.Max(0.001f, targetWorldFootprint);
+            float tooTallPenalty = Mathf.Max(0f, heightRatio - 0.72f) * 7.5f;
+            float tooFlatPenalty = Mathf.Max(0f, 0.08f - heightRatio) * 2f;
+            float score = squareness * 3.5f - tooTallPenalty - tooFlatPenalty - targetPenalty;
+            if (heightRatio > 1.25f)
+                score -= 5f;
 
             if (score <= bestScore)
                 continue;
@@ -463,6 +483,71 @@ public class WorldBaseMarker : MonoBehaviour
 
         activeVisual = null;
         activeVisualPrefab = null;
+    }
+
+    private void RebuildWorldFortWalls()
+    {
+        ClearWorldFortWalls();
+
+        if (!showWorldFortWalls || visualRoot == null)
+            return;
+
+        float footprint = Mathf.Max(0.8f, targetWorldFootprint);
+        float wallLength = footprint * 0.92f;
+        float half = wallLength * 0.5f;
+        float thickness = Mathf.Clamp(worldFortWallThickness, 0.04f, 0.35f);
+        float wallHeight = Mathf.Clamp(worldFortWallHeight, 0.06f, 0.8f);
+
+        GameObject root = new GameObject("WorldFortWalls");
+        root.transform.SetParent(visualRoot, false);
+        root.transform.localPosition = Vector3.zero;
+        root.transform.localRotation = Quaternion.identity;
+        worldFortRoot = root.transform;
+
+        CreateWorldWall("North", new Vector3(0f, wallHeight * 0.5f, half), new Vector3(wallLength, wallHeight, thickness));
+        CreateWorldWall("South", new Vector3(0f, wallHeight * 0.5f, -half), new Vector3(wallLength, wallHeight, thickness));
+        CreateWorldWall("East", new Vector3(half, wallHeight * 0.5f, 0f), new Vector3(thickness, wallHeight, wallLength));
+        CreateWorldWall("West", new Vector3(-half, wallHeight * 0.5f, 0f), new Vector3(thickness, wallHeight, wallLength));
+    }
+
+    private void CreateWorldWall(string wallName, Vector3 localPos, Vector3 localScale)
+    {
+        GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        wall.name = wallName;
+        wall.transform.SetParent(worldFortRoot, false);
+        wall.transform.localPosition = localPos;
+        wall.transform.localRotation = Quaternion.identity;
+        wall.transform.localScale = localScale;
+
+        Collider col = wall.GetComponent<Collider>();
+        if (col != null)
+            col.enabled = false;
+
+        Renderer renderer = wall.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+                shader = Shader.Find("Standard");
+            Material mat = new Material(shader);
+            mat.color = worldFortWallColor;
+            renderer.sharedMaterial = mat;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+        }
+    }
+
+    private void ClearWorldFortWalls()
+    {
+        if (worldFortRoot == null)
+            return;
+
+        if (Application.isPlaying)
+            Destroy(worldFortRoot.gameObject);
+        else
+            DestroyImmediate(worldFortRoot.gameObject);
+
+        worldFortRoot = null;
     }
 
     private void DisableVisualColliders()

@@ -12,12 +12,14 @@ public class BaseBuilding : MonoBehaviour
     public Transform uiAnchor;
     public bool useRootClickColliderOnly = true;
     public bool autoFitClickCollider;
+    public bool useDedicatedClickProxy = true;
 
     [Header("Runtime")]
     public bool isUpgrading;
     public float upgradeRemainingSeconds;
 
     private GameObject activeVisual;
+    private const string ClickProxyName = "ClickProxy";
 
     public BuildingLevelData CurrentLevelData =>
         data != null ? data.GetLevelData(currentLevel) : null;
@@ -27,6 +29,7 @@ public class BaseBuilding : MonoBehaviour
 
     void Awake()
     {
+        useDedicatedClickProxy = true;
         EnsureStructure();
         RefreshVisual();
         RebuildClickableCollider();
@@ -54,6 +57,7 @@ public class BaseBuilding : MonoBehaviour
             return;
         }
 
+        useDedicatedClickProxy = true;
         EnsureStructure();
         RefreshVisual();
         RebuildClickableCollider();
@@ -63,6 +67,25 @@ public class BaseBuilding : MonoBehaviour
     public void RebuildClickableCollider()
     {
         EnsureClickableCollider(autoFitClickCollider);
+    }
+
+    public void FitVisualToFootprint(float maxFootprint)
+    {
+        if (maxFootprint <= 0.05f)
+            return;
+
+        if (!TryGetVisualBounds(out Bounds bounds))
+            return;
+
+        float currentFootprint = Mathf.Max(bounds.size.x, bounds.size.z);
+        if (currentFootprint <= 0.001f)
+            return;
+
+        float fitMultiplier = maxFootprint / currentFootprint;
+
+        Transform scaleTarget = modelRoot != null ? modelRoot : transform;
+        float nextScale = Mathf.Clamp(scaleTarget.localScale.x * fitMultiplier, 0.025f, 6f);
+        scaleTarget.localScale = Vector3.one * nextScale;
     }
 
     void Update()
@@ -131,11 +154,15 @@ public class BaseBuilding : MonoBehaviour
         BuildingLevelData levelData =
             CurrentLevelData;
 
-        if (levelData == null || levelData.visualPrefab == null)
-            return;
-
+        HideLegacyRootRenderers();
         ClearModelRoot();
         activeVisual = null;
+
+        if (levelData == null || levelData.visualPrefab == null)
+        {
+            activeVisual = CreateFallbackVisual();
+            return;
+        }
 
         activeVisual =
             Instantiate(levelData.visualPrefab, modelRoot);
@@ -145,6 +172,85 @@ public class BaseBuilding : MonoBehaviour
         activeVisual.transform.localPosition = Vector3.zero;
         activeVisual.transform.localRotation = Quaternion.Euler(levelData.visualRotation);
         activeVisual.transform.localScale = levelData.visualScale;
+    }
+
+    private GameObject CreateFallbackVisual()
+    {
+        GameObject root = new GameObject("Fallback_" + (data != null ? data.type.ToString() : "Building"));
+        root.transform.SetParent(modelRoot, false);
+
+        BuildingType type = data != null ? data.type : BuildingType.Headquarters;
+
+        if (type == BuildingType.Barracks)
+        {
+            CreateFallbackBox(root.transform, "Barracks_Core", new Vector3(1f, 0.34f, 0.62f), new Vector3(0f, 0.17f, 0f), new Color(0.25f, 0.27f, 0.27f, 1f));
+            CreateFallbackBox(root.transform, "Barracks_Roof", new Vector3(1.08f, 0.10f, 0.70f), new Vector3(0f, 0.39f, 0f), new Color(0.12f, 0.15f, 0.16f, 1f));
+            return root;
+        }
+
+        if (type == BuildingType.ProductionFacility)
+        {
+            CreateFallbackBox(root.transform, "Facility_Core", new Vector3(1f, 0.42f, 0.74f), new Vector3(0f, 0.21f, 0f), new Color(0.22f, 0.28f, 0.30f, 1f));
+            CreateFallbackBox(root.transform, "Facility_Tank", new Vector3(0.28f, 0.34f, 0.28f), new Vector3(0.36f, 0.30f, 0.15f), new Color(0.42f, 0.43f, 0.40f, 1f));
+            return root;
+        }
+
+        CreateFallbackBox(root.transform, "Building_Core", new Vector3(1f, 0.45f, 1f), new Vector3(0f, 0.225f, 0f), new Color(0.24f, 0.26f, 0.27f, 1f));
+        return root;
+    }
+
+    private void CreateFallbackBox(Transform parent, string objectName, Vector3 size, Vector3 localPosition, Color color)
+    {
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        box.name = objectName;
+        box.transform.SetParent(parent, false);
+        box.transform.localPosition = localPosition;
+        box.transform.localRotation = Quaternion.identity;
+        box.transform.localScale = size;
+
+        Collider collider = box.GetComponent<Collider>();
+        if (collider != null)
+            collider.enabled = false;
+
+        Renderer renderer = box.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null)
+                shader = Shader.Find("Standard");
+
+            Material material = new Material(shader);
+            material.color = color;
+            renderer.sharedMaterial = material;
+        }
+    }
+
+    private void HideLegacyRootRenderers()
+    {
+        Renderer[] renderers = GetComponents<Renderer>();
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer != null)
+                renderer.enabled = false;
+        }
+
+        Renderer[] childRenderers = GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer renderer in childRenderers)
+        {
+            if (renderer == null)
+                continue;
+
+            if (modelRoot != null && renderer.transform.IsChildOf(modelRoot))
+                continue;
+
+            if (spawnPointsRoot != null && renderer.transform.IsChildOf(spawnPointsRoot))
+                continue;
+
+            if (uiAnchor != null && renderer.transform.IsChildOf(uiAnchor))
+                continue;
+
+            renderer.enabled = false;
+        }
     }
 
     public string GetDisplayName()
@@ -225,8 +331,11 @@ public class BaseBuilding : MonoBehaviour
 
     private void EnsureClickableCollider(bool forceRebuild)
     {
-        if (data != null)
-            forceRebuild = true;
+        if (useDedicatedClickProxy)
+        {
+            EnsureProxyClickCollider(forceRebuild);
+            return;
+        }
 
         if (!forceRebuild)
         {
@@ -234,7 +343,12 @@ public class BaseBuilding : MonoBehaviour
             if (existingRootCollider != null)
             {
                 if (ShouldResetExistingCollider(existingRootCollider))
-                    ApplyClickColliderPreset(existingRootCollider);
+                {
+                    if (!TryApplyRendererBoundsCollider(existingRootCollider))
+                        ApplyClickColliderPreset(existingRootCollider);
+                }
+
+                ClampColliderForType(existingRootCollider);
 
                 if (useRootClickColliderOnly)
                     DisableNestedModelColliders(existingRootCollider);
@@ -253,10 +367,101 @@ public class BaseBuilding : MonoBehaviour
         }
 
         BoxCollider collider = gameObject.AddComponent<BoxCollider>();
-        ApplyClickColliderPreset(collider);
+        if (!TryApplyRendererBoundsCollider(collider))
+            ApplyClickColliderPreset(collider);
+        ClampColliderForType(collider);
 
         if (useRootClickColliderOnly)
             DisableNestedModelColliders(collider);
+    }
+
+    private void EnsureProxyClickCollider(bool forceRebuild)
+    {
+        RemoveRootBoxColliders();
+
+        Transform proxyTransform = GetOrCreateClickProxyTransform();
+        if (proxyTransform == null)
+            return;
+
+        proxyTransform.localPosition = Vector3.zero;
+        proxyTransform.localRotation = Quaternion.identity;
+        proxyTransform.localScale = Vector3.one;
+
+        BuildingClickProxy proxy = proxyTransform.GetComponent<BuildingClickProxy>();
+        if (proxy == null)
+            proxy = proxyTransform.gameObject.AddComponent<BuildingClickProxy>();
+        proxy.owner = this;
+
+        BoxCollider collider = proxyTransform.GetComponent<BoxCollider>();
+        if (collider == null)
+            collider = proxyTransform.gameObject.AddComponent<BoxCollider>();
+
+        bool applied = TryApplyRendererBoundsCollider(collider);
+        if (!applied || forceRebuild)
+            ApplyClickColliderPreset(collider);
+
+        ClampColliderForType(collider);
+        ApplyFootprintClamp(collider);
+
+        if (useRootClickColliderOnly)
+            DisableNestedModelColliders(collider);
+    }
+
+    private void RemoveRootBoxColliders()
+    {
+        BoxCollider[] rootColliders = GetComponents<BoxCollider>();
+        for (int i = rootColliders.Length - 1; i >= 0; i--)
+        {
+            if (rootColliders[i] == null)
+                continue;
+
+            if (Application.isPlaying)
+                Destroy(rootColliders[i]);
+            else
+                DestroyImmediate(rootColliders[i]);
+        }
+    }
+
+    private Transform GetOrCreateClickProxyTransform()
+    {
+        Transform proxy = transform.Find(ClickProxyName);
+        if (proxy != null)
+            return proxy;
+
+        GameObject proxyObject = new GameObject(ClickProxyName);
+        proxyObject.transform.SetParent(transform, false);
+        return proxyObject.transform;
+    }
+
+    private void ApplyFootprintClamp(BoxCollider collider)
+    {
+        if (collider == null)
+            return;
+
+        GameModeManager manager =
+            GameModeManager.Instance != null
+                ? GameModeManager.Instance
+                : FindAnyObjectByType<GameModeManager>();
+
+        float suggestedFootprint =
+            manager != null && data != null
+                ? manager.GetSuggestedBuildingFootprint(data.type)
+                : 0.9f;
+
+        float maxXZ = Mathf.Clamp(suggestedFootprint * 0.9f, 0.35f, 1.35f);
+        float minXZ = Mathf.Clamp(maxXZ * 0.5f, 0.22f, 0.72f);
+
+        Vector3 size = collider.size;
+        size.x = Mathf.Clamp(size.x, minXZ, maxXZ);
+        size.z = Mathf.Clamp(size.z, minXZ, maxXZ);
+        size.y = Mathf.Clamp(size.y, 0.35f, 1.5f);
+        collider.size = size;
+
+        Vector3 center = collider.center;
+        center.x = Mathf.Clamp(center.x, -0.20f, 0.20f);
+        center.z = Mathf.Clamp(center.z, -0.20f, 0.20f);
+        center.y = Mathf.Clamp(center.y, 0.15f, 0.85f);
+        collider.center = center;
     }
 
     private void ApplyClickColliderPreset(BoxCollider collider)
@@ -268,27 +473,27 @@ public class BaseBuilding : MonoBehaviour
 
         if (type == BuildingType.Headquarters)
         {
-            collider.center = new Vector3(0f, 0.9f, 0f);
-            collider.size = new Vector3(2.65f, 1.75f, 2.65f);
+            collider.center = new Vector3(0f, 0.72f, 0f);
+            collider.size = new Vector3(1.35f, 1.45f, 1.35f);
             return;
         }
 
         if (type == BuildingType.Barracks)
         {
-            collider.center = new Vector3(0f, 0.65f, 0f);
-            collider.size = new Vector3(1.35f, 1.25f, 1.35f);
+            collider.center = new Vector3(0f, 0.48f, 0f);
+            collider.size = new Vector3(0.78f, 0.92f, 0.78f);
             return;
         }
 
         if (type == BuildingType.ProductionFacility)
         {
-            collider.center = new Vector3(0f, 0.7f, 0f);
-            collider.size = new Vector3(1.45f, 1.35f, 1.45f);
+            collider.center = new Vector3(0f, 0.52f, 0f);
+            collider.size = new Vector3(0.86f, 1f, 0.86f);
             return;
         }
 
-        collider.center = new Vector3(0f, 0.8f, 0f);
-        collider.size = new Vector3(2.2f, 1.6f, 2.2f);
+        collider.center = new Vector3(0f, 0.58f, 0f);
+        collider.size = new Vector3(1f, 1.15f, 1f);
     }
 
     private bool ShouldResetExistingCollider(BoxCollider collider)
@@ -300,9 +505,9 @@ public class BaseBuilding : MonoBehaviour
             return false;
 
         bool tooLarge =
-            collider.size.x > 4.8f ||
-            collider.size.y > 3.8f ||
-            collider.size.z > 4.8f;
+            collider.size.x > 2.2f ||
+            collider.size.y > 2.4f ||
+            collider.size.z > 2.2f;
 
         bool offCenter =
             Mathf.Abs(collider.center.x) > 1.2f ||
@@ -311,6 +516,53 @@ public class BaseBuilding : MonoBehaviour
             collider.center.y > 2.6f;
 
         return tooLarge || offCenter;
+    }
+
+    private void ClampColliderForType(BoxCollider collider)
+    {
+        if (collider == null)
+            return;
+
+        BuildingType type = data != null ? data.type : BuildingType.Headquarters;
+
+        float maxXZ = 1.2f;
+        float maxY = 1.6f;
+        float minXZ = 0.42f;
+        float minY = 0.55f;
+
+        if (type == BuildingType.Headquarters)
+        {
+            maxXZ = 1.8f;
+            maxY = 1.9f;
+            minXZ = 0.7f;
+            minY = 0.8f;
+        }
+        else if (type == BuildingType.Barracks)
+        {
+            maxXZ = 1.05f;
+            maxY = 1.25f;
+            minXZ = 0.48f;
+            minY = 0.62f;
+        }
+        else if (type == BuildingType.ProductionFacility)
+        {
+            maxXZ = 1.1f;
+            maxY = 1.35f;
+            minXZ = 0.52f;
+            minY = 0.65f;
+        }
+
+        Vector3 size = collider.size;
+        size.x = Mathf.Clamp(size.x, minXZ, maxXZ);
+        size.y = Mathf.Clamp(size.y, minY, maxY);
+        size.z = Mathf.Clamp(size.z, minXZ, maxXZ);
+        collider.size = size;
+
+        Vector3 center = collider.center;
+        center.x = Mathf.Clamp(center.x, -0.35f, 0.35f);
+        center.z = Mathf.Clamp(center.z, -0.35f, 0.35f);
+        center.y = Mathf.Clamp(center.y, 0.18f, maxY * 0.7f);
+        collider.center = center;
     }
 
     private bool TryApplyRendererBoundsCollider(BoxCollider collider)
@@ -348,8 +600,9 @@ public class BaseBuilding : MonoBehaviour
         if (!hasBounds)
             return false;
 
-        Vector3 localCenter = transform.InverseTransformPoint(bounds.center);
-        Vector3 scale = transform.lossyScale;
+        Transform colliderTransform = collider.transform;
+        Vector3 localCenter = colliderTransform.InverseTransformPoint(bounds.center);
+        Vector3 scale = colliderTransform.lossyScale;
         Vector3 localSize = new Vector3(
             bounds.size.x / Mathf.Max(0.001f, Mathf.Abs(scale.x)),
             bounds.size.y / Mathf.Max(0.001f, Mathf.Abs(scale.y)),
@@ -363,6 +616,41 @@ public class BaseBuilding : MonoBehaviour
         collider.center = localCenter;
         collider.size = localSize;
         return true;
+    }
+
+    private bool TryGetVisualBounds(out Bounds bounds)
+    {
+        bounds = new Bounds(transform.position, Vector3.one);
+
+        Renderer[] renderers =
+            modelRoot != null
+                ? modelRoot.GetComponentsInChildren<Renderer>(true)
+                : GetComponentsInChildren<Renderer>(true);
+
+        if (renderers == null || renderers.Length == 0)
+            return false;
+
+        bool hasBounds = false;
+        foreach (Renderer renderer in renderers)
+        {
+            if (renderer == null || !renderer.enabled)
+                continue;
+
+            if (IsNonBuildingSurface(renderer.transform))
+                continue;
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        return hasBounds;
     }
 
     private bool IsNonBuildingSurface(Transform target)

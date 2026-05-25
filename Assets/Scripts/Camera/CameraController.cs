@@ -1,11 +1,14 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using LegacyTouchPhase = UnityEngine.TouchPhase;
 
 public class CameraController : MonoBehaviour
 {
     [Header("Movement")]
     public float moveSpeed = 34f;
     public float dragSpeed = 0.11f;
+    public float touchPanWorldMultiplier = 0.018f;
+    public float touchPanBaseMultiplier = 0.011f;
 
     [Header("Zoom")]
     public float zoomSpeed = 11f;
@@ -14,7 +17,8 @@ public class CameraController : MonoBehaviour
     public bool autoEnterBaseOnCloseZoom = true;
     public float baseEnterHeight = 18f;
     public float baseEnterRadius = 28f;
-    public float baseExitScrollThreshold = -0.15f;
+    public float baseExitPinchThreshold = -1.5f;
+    public float baseAutoEnterCooldownAfterExit = 1.25f;
 
     [Header("View")]
     public float pitch = 58f;
@@ -28,12 +32,14 @@ public class CameraController : MonoBehaviour
     public float baseMoveSpeed = 18f;
     public float baseDragSpeed = 0.07f;
     public float baseZoomSpeed = 7.5f;
-    public float baseMinY = 7f;
-    public float baseMaxY = 34f;
-    public float basePanRadius = 34f;
-    public float baseExitHeight = 30f;
+    public float baseMinY = 2.4f;
+    public float baseMaxY = 13f;
+    public float basePanRadius = 6f;
+    public float baseExitHeight = 11.5f;
 
     private Vector3 lastMousePosition;
+    private float suppressAutoBaseEnterUntil;
+    private bool requireBaseZoneExitBeforeAutoEnter;
 
     void Start()
     {
@@ -52,7 +58,9 @@ public class CameraController : MonoBehaviour
 
         if (GameModeManager.Instance != null &&
             GameModeManager.Instance.CurrentMode != GameViewMode.WorldMap)
+        {
             return;
+        }
 
         if (GameModeManager.Instance != null &&
             GameModeManager.Instance.IsCameraTransitionActive)
@@ -60,13 +68,124 @@ public class CameraController : MonoBehaviour
             return;
         }
 
-        HandleMovement();
-        HandleDrag();
-        HandleZoom();
+        HandleWorldCamera();
+    }
+
+    private void HandleWorldCamera()
+    {
+        if (!IsAnyPointerOverUI())
+        {
+            bool handledTouchPan = HandleTouchPan(touchPanWorldMultiplier);
+            bool handledTouchZoom = HandlePinchZoom(zoomSpeed, minY, maxY, out _);
+
+            if (!handledTouchPan)
+            {
+                HandleMovement();
+                HandleDrag();
+            }
+
+            if (!handledTouchZoom)
+            {
+                HandleMouseWheelZoom(zoomSpeed, minY, maxY);
+                TryAutoEnterBaseView();
+            }
+
+            if (handledTouchZoom)
+                TryAutoEnterBaseView();
+        }
+
         ClampPosition();
     }
 
-    private bool IsPointerOverUI()
+    private void HandleBaseViewCamera()
+    {
+        if (GameModeManager.Instance == null ||
+            GameModeManager.Instance.CurrentMode != GameViewMode.BaseView ||
+            GameModeManager.Instance.IsCameraTransitionActive)
+        {
+            return;
+        }
+
+        if (!IsAnyPointerOverUI())
+        {
+            bool handledTouchPan = HandleTouchPan(touchPanBaseMultiplier);
+            bool handledTouchZoom = HandlePinchZoom(baseZoomSpeed, baseMinY, baseMaxY, out float pinchDelta);
+
+            if (!handledTouchPan)
+            {
+                HandleMovement(baseMoveSpeed);
+                HandleDrag(baseDragSpeed);
+            }
+
+            if (!handledTouchZoom)
+            {
+                HandleMouseWheelZoom(baseZoomSpeed, baseMinY, baseMaxY);
+                if (Input.mouseScrollDelta.y < -0.01f && transform.position.y >= baseExitHeight)
+                    GameModeManager.Instance.RequestEnterWorldMap(true);
+            }
+
+            if (handledTouchZoom &&
+                pinchDelta < baseExitPinchThreshold &&
+                transform.position.y >= baseExitHeight)
+            {
+                GameModeManager.Instance.RequestEnterWorldMap(true);
+            }
+        }
+
+        ClampBasePosition();
+    }
+
+    private bool HandleTouchPan(float multiplier)
+    {
+        if (Input.touchCount != 1)
+            return false;
+
+        Touch touch = Input.GetTouch(0);
+        if (touch.phase != LegacyTouchPhase.Moved)
+            return false;
+
+        Vector3 forward = transform.forward;
+        forward.y = 0f;
+        forward.Normalize();
+
+        Vector3 right = transform.right;
+        right.y = 0f;
+        right.Normalize();
+
+        Vector2 delta = touch.deltaPosition;
+        Vector3 worldDelta = (-right * delta.x + -forward * delta.y) * multiplier;
+        transform.position += worldDelta;
+        return true;
+    }
+
+    private bool HandlePinchZoom(float speed, float minHeight, float maxHeight, out float zoomDelta)
+    {
+        zoomDelta = 0f;
+        if (!TuranTouchInput.TryGetPinchOrScrollDelta(out float rawDelta))
+            return false;
+
+        if (Input.touchCount < 2)
+            return false;
+
+        zoomDelta = rawDelta;
+        Vector3 pos = transform.position + transform.forward * rawDelta * speed * 0.01f;
+        pos.y = Mathf.Clamp(pos.y, minHeight, maxHeight);
+        transform.position = pos;
+        return true;
+    }
+
+    private void HandleMouseWheelZoom(float speed, float minHeight, float maxHeight)
+    {
+        float scroll = Input.mouseScrollDelta.y;
+        if (Mathf.Abs(scroll) < 0.01f)
+            return;
+
+        Vector3 pos = transform.position + transform.forward * scroll * speed;
+        pos.y = Mathf.Clamp(pos.y, minHeight, maxHeight);
+        transform.position = pos;
+    }
+
+    private bool IsAnyPointerOverUI()
     {
         if (EventSystem.current == null)
             return false;
@@ -77,38 +196,6 @@ public class CameraController : MonoBehaviour
         return EventSystem.current.IsPointerOverGameObject();
     }
 
-    void HandleBaseViewCamera()
-    {
-        if (GameModeManager.Instance == null ||
-            GameModeManager.Instance.CurrentMode != GameViewMode.BaseView ||
-            GameModeManager.Instance.IsCameraTransitionActive)
-        {
-            return;
-        }
-
-        if (!IsPointerOverUI())
-        {
-            HandleMovement(baseMoveSpeed);
-            HandleDrag(baseDragSpeed);
-            HandleBaseZoom();
-            ClampBasePosition();
-        }
-    }
-
-    void HandleBaseZoom()
-    {
-        float scroll = Input.mouseScrollDelta.y;
-        if (Mathf.Abs(scroll) < 0.01f)
-            return;
-
-        Vector3 pos = transform.position + transform.forward * scroll * baseZoomSpeed;
-        pos.y = Mathf.Clamp(pos.y, baseMinY, baseMaxY);
-        transform.position = pos;
-
-        if (scroll < baseExitScrollThreshold && transform.position.y >= baseExitHeight)
-            GameModeManager.Instance.EnterWorldMap(true);
-    }
-
     void HandleMovement()
     {
         HandleMovement(moveSpeed);
@@ -116,9 +203,6 @@ public class CameraController : MonoBehaviour
 
     void HandleMovement(float speed)
     {
-        if (IsPointerOverUI())
-            return;
-
         float h = Input.GetAxisRaw("Horizontal");
         float v = Input.GetAxisRaw("Vertical");
 
@@ -131,9 +215,7 @@ public class CameraController : MonoBehaviour
         right.Normalize();
 
         Vector3 dir = (right * h + forward * v).normalized;
-
-        transform.position +=
-            dir * speed * Time.deltaTime;
+        transform.position += dir * speed * Time.deltaTime;
     }
 
     void HandleDrag()
@@ -143,9 +225,6 @@ public class CameraController : MonoBehaviour
 
     void HandleDrag(float speed)
     {
-        if (IsPointerOverUI())
-            return;
-
         if (Input.GetMouseButtonDown(2) || Input.GetMouseButtonDown(1))
             lastMousePosition = Input.mousePosition;
 
@@ -163,35 +242,15 @@ public class CameraController : MonoBehaviour
         right.y = 0f;
         right.Normalize();
 
-        transform.position -=
-            (right * delta.x + forward * delta.y) * speed;
-    }
-
-    void HandleZoom()
-    {
-        if (IsPointerOverUI())
-            return;
-
-        float scroll =
-            Input.mouseScrollDelta.y;
-
-        if (Mathf.Abs(scroll) < 0.01f)
-            return;
-
-        Vector3 pos =
-            transform.position + transform.forward * scroll * zoomSpeed;
-
-        pos.y =
-            Mathf.Clamp(pos.y, minY, maxY);
-
-        transform.position = pos;
-
-        TryAutoEnterBaseView();
+        transform.position -= (right * delta.x + forward * delta.y) * speed;
     }
 
     private void TryAutoEnterBaseView()
     {
         if (!autoEnterBaseOnCloseZoom)
+            return;
+
+        if (Time.unscaledTime < suppressAutoBaseEnterUntil)
             return;
 
         if (GameModeManager.Instance == null ||
@@ -201,21 +260,43 @@ public class CameraController : MonoBehaviour
             return;
         }
 
-        if (transform.position.y > baseEnterHeight)
+        if (requireBaseZoneExitBeforeAutoEnter)
+        {
+            if (IsInsideBaseAutoEnterZone())
+                return;
+
+            requireBaseZoneExitBeforeAutoEnter = false;
+        }
+
+        if (!IsInsideBaseAutoEnterZone())
             return;
+
+        GameModeManager.Instance.RequestEnterBaseView();
+    }
+
+    private bool IsInsideBaseAutoEnterZone()
+    {
+        if (transform.position.y > baseEnterHeight)
+        {
+            return false;
+        }
 
         WorldBaseMarker closestMarker = FindClosestBaseMarker();
         if (closestMarker == null)
-            return;
+            return false;
 
         Vector2 cameraXZ = new Vector2(transform.position.x, transform.position.z);
         Vector2 baseXZ = new Vector2(closestMarker.transform.position.x, closestMarker.transform.position.z);
         float distance = Vector2.Distance(cameraXZ, baseXZ);
 
-        if (distance > baseEnterRadius)
-            return;
+        return distance <= baseEnterRadius;
+    }
 
-        GameModeManager.Instance.EnterBaseView();
+    public void SuppressAutoEnterBase(float seconds = -1f)
+    {
+        float duration = seconds > 0f ? seconds : baseAutoEnterCooldownAfterExit;
+        suppressAutoBaseEnterUntil = Mathf.Max(suppressAutoBaseEnterUntil, Time.unscaledTime + duration);
+        requireBaseZoneExitBeforeAutoEnter = true;
     }
 
     private WorldBaseMarker FindClosestBaseMarker()
@@ -232,10 +313,7 @@ public class CameraController : MonoBehaviour
 
         foreach (WorldBaseMarker marker in markers)
         {
-            if (marker == null || !marker.gameObject.activeInHierarchy)
-                continue;
-
-            if (!marker.IsPlacementMarker)
+            if (marker == null || !marker.gameObject.activeInHierarchy || !marker.IsPlacementMarker)
                 continue;
 
             Vector2 markerXZ = new Vector2(marker.transform.position.x, marker.transform.position.z);
@@ -283,9 +361,10 @@ public class CameraController : MonoBehaviour
         autoEnterBaseOnCloseZoom = true;
         baseEnterHeight = Mathf.Clamp(baseEnterHeight, 16f, 20f);
         baseEnterRadius = Mathf.Clamp(baseEnterRadius, 22f, 34f);
-        baseExitScrollThreshold = Mathf.Min(baseExitScrollThreshold, -0.1f);
-        baseMinY = Mathf.Clamp(baseMinY, 6f, 9f);
-        baseMaxY = Mathf.Clamp(baseMaxY, 28f, 40f);
-        baseExitHeight = Mathf.Clamp(baseExitHeight, 24f, baseMaxY);
+        baseExitPinchThreshold = Mathf.Clamp(baseExitPinchThreshold, -4f, -0.4f);
+        baseMinY = Mathf.Clamp(baseMinY, 2f, 3.8f);
+        baseMaxY = Mathf.Clamp(baseMaxY, 10f, 16f);
+        basePanRadius = Mathf.Clamp(basePanRadius, 3.5f, 9f);
+        baseExitHeight = Mathf.Clamp(baseExitHeight, 8.5f, baseMaxY);
     }
 }

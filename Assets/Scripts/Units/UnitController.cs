@@ -70,18 +70,20 @@ public HexCell currentHex;
 
     public void RefreshVisualFromData()
     {
-        if (unitData == null || unitData.visualProfile == null)
-            return;
-
-        if (unitData.visualProfile.characterPrefab == null)
-            return;
-
         UnitVisualAssembler assembler = GetComponent<UnitVisualAssembler>();
         if (assembler == null)
             assembler = gameObject.AddComponent<UnitVisualAssembler>();
 
         assembler.unitController = this;
         assembler.formationController = GetComponent<FormationController>();
+
+        if (unitData == null || unitData.visualProfile == null)
+        {
+            SetChildrenActive(true);
+            assembler.EnsureExistingChildrenVisible();
+            return;
+        }
+
         assembler.Assemble(unitData);
     }
 
@@ -235,7 +237,10 @@ public HexCell currentHex;
 
         transform.localPosition = localPosition;
         transform.localRotation = Quaternion.identity;
-        transform.localScale = Vector3.one * 0.58f;
+        float baseScale = GameModeManager.Instance != null
+            ? GameModeManager.Instance.GetSuggestedBaseUnitScale()
+            : 0.28f;
+        transform.localScale = Vector3.one * baseScale;
         gameObject.SetActive(true);
         SetChildrenActive(true);
     }
@@ -293,9 +298,18 @@ public HexCell currentHex;
         for (int i = 0; i < transform.childCount; i++)
         {
             Transform child = transform.GetChild(i);
-            if (child != null)
-                child.gameObject.SetActive(active);
+            SetHierarchyActive(child, active);
         }
+    }
+
+    private void SetHierarchyActive(Transform root, bool active)
+    {
+        if (root == null)
+            return;
+
+        root.gameObject.SetActive(active);
+        for (int i = 0; i < root.childCount; i++)
+            SetHierarchyActive(root.GetChild(i), active);
     }
 
     void SetNextTarget()
