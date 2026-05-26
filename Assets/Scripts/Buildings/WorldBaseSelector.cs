@@ -50,6 +50,18 @@ public class WorldBaseSelector : MonoBehaviour
         SelectionChanged?.Invoke(null);
     }
 
+    public void SelectMarker(WorldBaseMarker marker)
+    {
+        if (marker == null || !marker.IsPlacementMarker)
+        {
+            ClearSelection();
+            return;
+        }
+
+        selectedMarker = marker;
+        SelectionChanged?.Invoke(selectedMarker);
+    }
+
     private void TrySelectMarker(Vector2 screenPosition)
     {
         if (cam == null)

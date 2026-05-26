@@ -22,8 +22,8 @@ public class BarracksBuilding : MonoBehaviour
 
     [Header("Base Spawn View")]
     public Transform baseUnitStagingAnchor;
-    public Vector3 baseUnitStagingOffset = new Vector3(0f, 0.03f, 0.55f);
-    public float baseUnitCellSpacing = 0.24f;
+    public Vector3 baseUnitStagingOffset = new Vector3(0f, 0.08f, 0.08f);
+    public float baseUnitCellSpacing = 0.18f;
 
     private BaseBuilding baseBuilding;
     private float trainingEndTime;
@@ -104,6 +104,7 @@ public class BarracksBuilding : MonoBehaviour
     void Awake()
     {
         baseBuilding = GetComponent<BaseBuilding>();
+        NormalizeStagingSettings();
         CleanupAssignedUnits();
         EnsureStagingAnchor();
     }
@@ -332,6 +333,8 @@ public class BarracksBuilding : MonoBehaviour
         Vector3 spawnPosition = GetWorldSpawnPosition();
         unit.PlaceOnWorld(spawnPosition);
         MarkUnitOnMap(unit);
+        unit.RefreshVisualFromData();
+        ApplyVisibleSoldierCount(unit);
 
         Debug.Log("Kisladan haritaya birlik cikarildi: " + unit.name);
 
@@ -363,6 +366,8 @@ public class BarracksBuilding : MonoBehaviour
 
         unit.PlaceInBase(baseParent, GetBaseUnitLocalPosition());
         MarkUnitInBase(unit);
+        unit.RefreshVisualFromData();
+        ApplyVisibleSoldierCount(unit);
 
         if (enterBaseView && GameModeManager.Instance != null)
             GameModeManager.Instance.RequestEnterBaseView(true);
@@ -420,6 +425,11 @@ public class BarracksBuilding : MonoBehaviour
         UnitController existing = GetFirstUnit(UnitDeploymentState.InBase);
         if (existing != null)
         {
+            EnsureStagingAnchor();
+            Transform existingBaseParent = baseUnitStagingAnchor != null
+                ? baseUnitStagingAnchor
+                : transform;
+            existing.PlaceInBase(existingBaseParent, GetBaseUnitLocalPosition());
             existing.RefreshVisualFromData();
             UpdateRepresentativeSoldiers();
             return existing;
@@ -480,19 +490,29 @@ public class BarracksBuilding : MonoBehaviour
             if (unit == null || unit.deploymentState != UnitDeploymentState.InBase)
                 continue;
 
-            FormationController formation = unit.GetComponent<FormationController>();
-            if (formation != null)
-            {
-                int visible = assignedUnitData != null &&
-                    (assignedUnitData.kind == TuranUnitKind.Tank ||
-                     assignedUnitData.kind == TuranUnitKind.Artillery ||
-                     assignedUnitData.kind == TuranUnitKind.RocketArtillery)
-                    ? Mathf.Min(1, trainedSoldiers)
-                    : trainedSoldiers;
-
-                formation.SetVisibleSoldierCount(visible);
-            }
+            ApplyVisibleSoldierCount(unit);
         }
+    }
+
+    private void ApplyVisibleSoldierCount(UnitController unit)
+    {
+        if (unit == null)
+            return;
+
+        FormationController formation = unit.GetComponent<FormationController>();
+        if (formation == null)
+            return;
+
+        formation.RebuildSoldiersFromChildren(true);
+
+        int visible = assignedUnitData != null &&
+            (assignedUnitData.kind == TuranUnitKind.Tank ||
+             assignedUnitData.kind == TuranUnitKind.Artillery ||
+             assignedUnitData.kind == TuranUnitKind.RocketArtillery)
+            ? Mathf.Min(1, trainedSoldiers)
+            : trainedSoldiers;
+
+        formation.SetVisibleSoldierCount(visible);
     }
 
     private UnitController FindVisualTemplate()
@@ -554,10 +574,16 @@ public class BarracksBuilding : MonoBehaviour
 
     private Vector3 GetBaseUnitLocalPosition()
     {
-        int index = Mathf.Max(0, UnitsInBaseCount);
+        int index = showSingleBaseRepresentative ? 0 : Mathf.Max(0, UnitsInBaseCount);
         float x = (index % 3 - 1) * baseUnitCellSpacing;
         float z = baseUnitStagingOffset.z + (index / 3) * baseUnitCellSpacing;
         return new Vector3(x + baseUnitStagingOffset.x, baseUnitStagingOffset.y, z);
+    }
+
+    private void NormalizeStagingSettings()
+    {
+        baseUnitStagingOffset = new Vector3(0f, 0.08f, 0.08f);
+        baseUnitCellSpacing = 0.17f;
     }
 
     private bool HasDeployableVisual(UnitController unit)
@@ -585,6 +611,12 @@ public class BarracksBuilding : MonoBehaviour
             if (renderer.GetComponentInParent<HexCell>() != null)
                 continue;
 
+            if (renderer.GetComponentInParent<Canvas>() != null ||
+                renderer.GetComponentInParent<RectTransform>() != null)
+            {
+                continue;
+            }
+
             return true;
         }
 
@@ -609,6 +641,7 @@ public class BarracksBuilding : MonoBehaviour
         if (existing != null)
         {
             baseUnitStagingAnchor = existing;
+            NormalizeStagingAnchor();
             return;
         }
 
@@ -618,6 +651,17 @@ public class BarracksBuilding : MonoBehaviour
         anchor.transform.localRotation = Quaternion.identity;
         anchor.transform.localScale = Vector3.one;
         baseUnitStagingAnchor = anchor.transform;
+        NormalizeStagingAnchor();
+    }
+
+    private void NormalizeStagingAnchor()
+    {
+        if (baseUnitStagingAnchor == null)
+            return;
+
+        baseUnitStagingAnchor.localPosition = Vector3.zero;
+        baseUnitStagingAnchor.localRotation = Quaternion.identity;
+        baseUnitStagingAnchor.localScale = Vector3.one;
     }
 }
 

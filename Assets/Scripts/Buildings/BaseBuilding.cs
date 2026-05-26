@@ -183,8 +183,11 @@ public class BaseBuilding : MonoBehaviour
 
         if (type == BuildingType.Barracks)
         {
-            CreateFallbackBox(root.transform, "Barracks_Core", new Vector3(1f, 0.34f, 0.62f), new Vector3(0f, 0.17f, 0f), new Color(0.25f, 0.27f, 0.27f, 1f));
-            CreateFallbackBox(root.transform, "Barracks_Roof", new Vector3(1.08f, 0.10f, 0.70f), new Vector3(0f, 0.39f, 0f), new Color(0.12f, 0.15f, 0.16f, 1f));
+            CreateFallbackBox(root.transform, "Barracks_TrainingPad", new Vector3(1.15f, 0.04f, 0.78f), new Vector3(0f, 0.02f, 0f), new Color(0.24f, 0.22f, 0.19f, 1f));
+            CreateFallbackBox(root.transform, "Barracks_RunLane_A", new Vector3(0.10f, 0.05f, 0.64f), new Vector3(-0.34f, 0.07f, 0f), new Color(0.42f, 0.35f, 0.22f, 1f));
+            CreateFallbackBox(root.transform, "Barracks_RunLane_B", new Vector3(0.10f, 0.05f, 0.64f), new Vector3(0.34f, 0.07f, 0f), new Color(0.42f, 0.35f, 0.22f, 1f));
+            CreateFallbackBox(root.transform, "Barracks_Obstacle", new Vector3(0.62f, 0.08f, 0.08f), new Vector3(0f, 0.12f, 0.23f), new Color(0.34f, 0.28f, 0.18f, 1f));
+            CreateFallbackBox(root.transform, "Barracks_Sandbag", new Vector3(0.78f, 0.12f, 0.10f), new Vector3(0f, 0.11f, -0.32f), new Color(0.47f, 0.43f, 0.33f, 1f));
             return root;
         }
 
@@ -480,8 +483,8 @@ public class BaseBuilding : MonoBehaviour
 
         if (type == BuildingType.Barracks)
         {
-            collider.center = new Vector3(0f, 0.48f, 0f);
-            collider.size = new Vector3(0.78f, 0.92f, 0.78f);
+            collider.center = new Vector3(0f, 0.18f, 0f);
+            collider.size = new Vector3(0.92f, 0.36f, 0.72f);
             return;
         }
 
@@ -540,9 +543,9 @@ public class BaseBuilding : MonoBehaviour
         else if (type == BuildingType.Barracks)
         {
             maxXZ = 1.05f;
-            maxY = 1.25f;
+            maxY = 0.72f;
             minXZ = 0.48f;
-            minY = 0.62f;
+            minY = 0.25f;
         }
         else if (type == BuildingType.ProductionFacility)
         {

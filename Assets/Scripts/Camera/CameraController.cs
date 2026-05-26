@@ -5,18 +5,18 @@ using LegacyTouchPhase = UnityEngine.TouchPhase;
 public class CameraController : MonoBehaviour
 {
     [Header("Movement")]
-    public float moveSpeed = 34f;
-    public float dragSpeed = 0.11f;
-    public float touchPanWorldMultiplier = 0.018f;
+    public float moveSpeed = 42f;
+    public float dragSpeed = 0.16f;
+    public float touchPanWorldMultiplier = 0.024f;
     public float touchPanBaseMultiplier = 0.011f;
 
     [Header("Zoom")]
-    public float zoomSpeed = 11f;
-    public float minY = 14f;
-    public float maxY = 86f;
-    public bool autoEnterBaseOnCloseZoom = true;
-    public float baseEnterHeight = 18f;
-    public float baseEnterRadius = 28f;
+    public float zoomSpeed = 15f;
+    public float minY = 5.8f;
+    public float maxY = 110f;
+    public bool autoEnterBaseOnCloseZoom = false;
+    public float baseEnterHeight = 10.5f;
+    public float baseEnterRadius = 13f;
     public float baseExitPinchThreshold = -1.5f;
     public float baseAutoEnterCooldownAfterExit = 1.25f;
 
@@ -40,11 +40,13 @@ public class CameraController : MonoBehaviour
     private Vector3 lastMousePosition;
     private float suppressAutoBaseEnterUntil;
     private bool requireBaseZoneExitBeforeAutoEnter;
+    private bool hasWorldBounds;
 
     void Start()
     {
         ApplyWarpathStyleZoomTuning();
-        ApplyStrategicRotation();
+        if (GameModeManager.Instance == null)
+            ApplyStrategicRotation();
     }
 
     void Update()
@@ -225,10 +227,10 @@ public class CameraController : MonoBehaviour
 
     void HandleDrag(float speed)
     {
-        if (Input.GetMouseButtonDown(2) || Input.GetMouseButtonDown(1))
+        if (Input.GetMouseButtonDown(2) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(0))
             lastMousePosition = Input.mousePosition;
 
-        if (!Input.GetMouseButton(2) && !Input.GetMouseButton(1))
+        if (!Input.GetMouseButton(2) && !Input.GetMouseButton(1) && !Input.GetMouseButton(0))
             return;
 
         Vector3 delta = Input.mousePosition - lastMousePosition;
@@ -331,11 +333,52 @@ public class CameraController : MonoBehaviour
 
     void ClampPosition()
     {
-        Vector3 pos = transform.position;
+        Vector3 pos = ClampWorldPosition(transform.position);
+        transform.position = pos;
+    }
+
+    public void SetWorldBounds(Bounds bounds, float padding)
+    {
+        if (bounds.size.x <= 0f || bounds.size.z <= 0f)
+            return;
+
+        minX = bounds.min.x + padding;
+        maxX = bounds.max.x - padding;
+        minZ = bounds.min.z + padding;
+        maxZ = bounds.max.z - padding;
+
+        if (minX > maxX)
+        {
+            float mid = bounds.center.x;
+            minX = mid;
+            maxX = mid;
+        }
+
+        if (minZ > maxZ)
+        {
+            float mid = bounds.center.z;
+            minZ = mid;
+            maxZ = mid;
+        }
+
+        hasWorldBounds = true;
+    }
+
+    public Vector3 ClampWorldPosition(Vector3 position)
+    {
+        Vector3 pos = position;
+        if (!hasWorldBounds)
+        {
+            pos.x = Mathf.Clamp(pos.x, minX, maxX);
+            pos.y = Mathf.Clamp(pos.y, minY, maxY);
+            pos.z = Mathf.Clamp(pos.z, minZ, maxZ);
+            return pos;
+        }
+
         pos.x = Mathf.Clamp(pos.x, minX, maxX);
         pos.y = Mathf.Clamp(pos.y, minY, maxY);
         pos.z = Mathf.Clamp(pos.z, minZ, maxZ);
-        transform.position = pos;
+        return pos;
     }
 
     void ClampBasePosition()
@@ -358,13 +401,18 @@ public class CameraController : MonoBehaviour
 
     private void ApplyWarpathStyleZoomTuning()
     {
-        autoEnterBaseOnCloseZoom = true;
-        baseEnterHeight = Mathf.Clamp(baseEnterHeight, 16f, 20f);
-        baseEnterRadius = Mathf.Clamp(baseEnterRadius, 22f, 34f);
+        autoEnterBaseOnCloseZoom = false;
+        moveSpeed = Mathf.Clamp(moveSpeed, 38f, 56f);
+        dragSpeed = Mathf.Clamp(dragSpeed, 0.13f, 0.22f);
+        zoomSpeed = Mathf.Clamp(zoomSpeed, 13f, 22f);
+        minY = Mathf.Clamp(minY, 5.4f, 8f);
+        maxY = Mathf.Clamp(maxY, 96f, 128f);
+        baseEnterHeight = Mathf.Clamp(baseEnterHeight, 9f, 13f);
+        baseEnterRadius = Mathf.Clamp(baseEnterRadius, 9f, 16f);
         baseExitPinchThreshold = Mathf.Clamp(baseExitPinchThreshold, -4f, -0.4f);
         baseMinY = Mathf.Clamp(baseMinY, 2f, 3.8f);
         baseMaxY = Mathf.Clamp(baseMaxY, 10f, 16f);
-        basePanRadius = Mathf.Clamp(basePanRadius, 3.5f, 9f);
+        basePanRadius = Mathf.Clamp(basePanRadius, 5f, 11f);
         baseExitHeight = Mathf.Clamp(baseExitHeight, 8.5f, baseMaxY);
     }
 }

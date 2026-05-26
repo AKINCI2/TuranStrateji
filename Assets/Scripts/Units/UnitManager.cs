@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 
 public class UnitManager : MonoBehaviour
@@ -6,14 +6,19 @@ public class UnitManager : MonoBehaviour
     public static UnitManager Instance;
 
     [Header("Units")]
-    public List<UnitController> units =
-        new List<UnitController>();
-
-    private List<UnitController> selectedUnits =
-        new List<UnitController>();
+    public List<UnitController> units = new List<UnitController>();
+    private List<UnitController> playerUnits = new List<UnitController>();
+    private List<UnitController> enemyUnits = new List<UnitController>();
+    private List<UnitController> selectedUnits = new List<UnitController>();
 
     void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
     }
 
@@ -26,8 +31,10 @@ public class UnitManager : MonoBehaviour
             foreach (var u in sceneUnits) RegisterUnit(u);
         }
 
+        RebuildTeamLists();
+
         if (GameModeManager.Instance != null)
-GameModeManager.Instance.ModeChanged += OnGameModeChanged;
+            GameModeManager.Instance.ModeChanged += OnGameModeChanged;
 
         RefreshUnitVisibility();
     }
@@ -36,6 +43,72 @@ GameModeManager.Instance.ModeChanged += OnGameModeChanged;
     {
         if (GameModeManager.Instance != null)
             GameModeManager.Instance.ModeChanged -= OnGameModeChanged;
+
+        if (Instance == this)
+            Instance = null;
+    }
+
+    public void UnregisterUnit(UnitController unit)
+    {
+        if (unit == null) return;
+        units.Remove(unit);
+        playerUnits.Remove(unit);
+        enemyUnits.Remove(unit);
+        selectedUnits.Remove(unit);
+    }
+
+    public UnitController GetNearestEnemy(Vector3 position, float range, bool isEnemySearchingForPlayer)
+    {
+        List<UnitController> targets = isEnemySearchingForPlayer ? playerUnits : enemyUnits;
+        return GetNearestFromList(position, range, targets);
+    }
+
+    public UnitController GetNearestHostile(UnitController seeker, float range)
+    {
+        if (seeker == null)
+            return null;
+
+        bool seekerIsEnemy = IsEnemyUnit(seeker);
+        List<UnitController> targets = seekerIsEnemy ? playerUnits : enemyUnits;
+        return GetNearestFromList(seeker.transform.position, range, targets, seeker);
+    }
+
+    public bool AreHostile(UnitController first, UnitController second)
+    {
+        if (first == null || second == null || first == second)
+            return false;
+
+        return IsEnemyUnit(first) != IsEnemyUnit(second);
+    }
+
+    public bool IsEnemy(UnitController unit)
+    {
+        return IsEnemyUnit(unit);
+    }
+
+    private UnitController GetNearestFromList(
+        Vector3 position,
+        float range,
+        List<UnitController> targets,
+        UnitController ignoredUnit = null)
+    {
+        UnitController closest = null;
+        float minSqrDistance = range * range;
+
+        foreach (var target in targets)
+        {
+            if (!IsCombatTargetable(target) || target == ignoredUnit)
+                continue;
+
+            float sqrDistance = (position - target.transform.position).sqrMagnitude;
+            if (sqrDistance < minSqrDistance)
+            {
+                minSqrDistance = sqrDistance;
+                closest = target;
+            }
+        }
+
+        return closest;
     }
 
     // =====================================================
@@ -47,7 +120,9 @@ GameModeManager.Instance.ModeChanged += OnGameModeChanged;
         if (unit == null)
             return;
 
-        if (IsEnemyUnit(unit) && unit.assignedBarracks == null)
+        bool isEnemy = IsEnemyUnit(unit);
+
+        if (isEnemy && unit.assignedBarracks == null)
         {
             unit.usesWorldHexGrid = true;
             unit.SetDeploymentState(UnitDeploymentState.OnWorldMap);
@@ -62,9 +137,9 @@ GameModeManager.Instance.ModeChanged += OnGameModeChanged;
         }
 
         if (!units.Contains(unit))
-        {
             units.Add(unit);
-        }
+
+        RegisterUnitTeam(unit, isEnemy);
 
         // Setup Supply System
         if (unit.unitData != null)
@@ -81,7 +156,7 @@ GameModeManager.Instance.ModeChanged += OnGameModeChanged;
         }
 
         EnsureSelectionVisual(unit);
-SetUnitSelected(unit, unit.isSelected);
+        SetUnitSelected(unit, unit.isSelected);
 
         if (!IsLogisticsUnit(unit) && !IsEnemyUnit(unit) && unit.assignedBarracks == null)
         {
@@ -439,6 +514,15 @@ SetUnitSelected(unit, unit.isSelected);
             shouldShow = false;
 
         unit.gameObject.SetActive(shouldShow);
+
+        if (shouldShow)
+        {
+            unit.RefreshVisualFromData();
+
+            FormationController formation = unit.GetComponent<FormationController>();
+            if (formation != null)
+                formation.RebuildSoldiersFromChildren(true);
+        }
     }
 
     private void NormalizeUnitGridUsage(UnitController unit)
@@ -535,20 +619,37 @@ SetUnitSelected(unit, unit.isSelected);
         if (unit == null || !unit.CompareTag("Enemy"))
             return false;
 
-        if (unit.assignedBarracks != null)
-            return false;
+        return unit.assignedBarracks == null ||
+               unit.deploymentState == UnitDeploymentState.OnWorldMap;
+    }
 
-        string hierarchyName = unit.name.ToLowerInvariant();
-        Transform parent = unit.transform.parent;
-        while (parent != null)
-        {
-            hierarchyName += " " + parent.name.ToLowerInvariant();
-            parent = parent.parent;
-        }
+    private bool IsCombatTargetable(UnitController unit)
+    {
+        return unit != null &&
+               unit.state != UnitState.Death &&
+               unit.deploymentState == UnitDeploymentState.OnWorldMap &&
+               unit.gameObject.activeInHierarchy;
+    }
 
-        return hierarchyName.Contains("enemy") ||
-               hierarchyName.Contains("dusman") ||
-               hierarchyName.Contains("düşman");
+    private void RegisterUnitTeam(UnitController unit, bool isEnemy)
+    {
+        playerUnits.Remove(unit);
+        enemyUnits.Remove(unit);
+
+        if (isEnemy)
+            enemyUnits.Add(unit);
+        else
+            playerUnits.Add(unit);
+    }
+
+    private void RebuildTeamLists()
+    {
+        playerUnits.Clear();
+        enemyUnits.Clear();
+        units.RemoveAll(unit => unit == null);
+
+        foreach (UnitController unit in units)
+            RegisterUnitTeam(unit, IsEnemyUnit(unit));
     }
 
     private bool ShouldShowUnitInBase(UnitController unit)

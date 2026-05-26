@@ -195,6 +195,17 @@ public class ProductionFacilityManager : MonoBehaviour
             slots.Add(new ProductionSlot());
     }
 
+    public void EnsureSlotCount(int count)
+    {
+        slotCount = Mathf.Max(1, count);
+        EnsureSlots();
+    }
+
+    public void NotifyChanged()
+    {
+        ProductionChanged?.Invoke();
+    }
+
     public bool HasFreeSlot()
     {
         EnsureSlots();

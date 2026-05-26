@@ -142,6 +142,19 @@ public class UnitVisualAssembler : MonoBehaviour
             Transform child = transform.GetChild(i);
             SetHierarchyActive(child, true);
         }
+
+        bool clonedFallback = false;
+        if (!HasCombatVisual(transform))
+            clonedFallback = TryCloneSceneFallbackVisual();
+
+        if (!HasCombatVisual(transform))
+            clonedFallback = TryCloneLooseSoldierVisuals() || clonedFallback;
+
+        if (formationController == null)
+            formationController = GetComponent<FormationController>();
+
+        if (formationController != null)
+            formationController.RebuildSoldiersFromChildren(clonedFallback);
     }
 
     private void SetHierarchyActive(Transform root, bool active)
@@ -153,5 +166,172 @@ public class UnitVisualAssembler : MonoBehaviour
 
         for (int i = 0; i < root.childCount; i++)
             SetHierarchyActive(root.GetChild(i), active);
+    }
+
+    private bool TryCloneSceneFallbackVisual()
+    {
+        UnitController[] controllers =
+            FindObjectsByType<UnitController>(FindObjectsInactive.Include);
+
+        foreach (UnitController controller in controllers)
+        {
+            if (controller == null || controller.transform == transform)
+                continue;
+
+            if (controller.unitData != null &&
+                controller.unitData.kind == TuranUnitKind.Logistics)
+            {
+                continue;
+            }
+
+            if (!HasCombatVisual(controller.transform))
+                continue;
+
+            int cloned = CloneCombatVisualChildren(controller.transform);
+            if (cloned > 0)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool TryCloneLooseSoldierVisuals()
+    {
+        Transform[] transforms = Resources.FindObjectsOfTypeAll<Transform>();
+        int cloned = 0;
+
+        foreach (Transform candidate in transforms)
+        {
+            if (candidate == null || candidate == transform || candidate.root == transform)
+                continue;
+
+            if (!candidate.gameObject.scene.IsValid())
+                continue;
+
+            if (!IsCombatVisualRoot(candidate))
+                continue;
+
+            if (candidate.GetComponentInParent<UnitVisualAssembler>() != null)
+                continue;
+
+            string lowerName = candidate.name.ToLowerInvariant();
+            bool looksLikeSoldier =
+                lowerName.StartsWith("soldier") ||
+                lowerName.Contains("asker") ||
+                lowerName.Contains("piyade");
+
+            if (!looksLikeSoldier && candidate.GetComponentInChildren<Animator>(true) == null)
+                continue;
+
+            GameObject clone = Instantiate(candidate.gameObject, transform);
+            clone.name = candidate.name + "_Fallback";
+            clone.transform.localPosition = Vector3.zero;
+            clone.transform.localRotation = Quaternion.identity;
+            clone.transform.localScale = Vector3.one;
+            SetHierarchyActive(clone.transform, true);
+            spawnedVisuals.Add(clone);
+            cloned++;
+
+            if (cloned >= 4)
+                break;
+        }
+
+        return cloned > 0;
+    }
+
+    private int CloneCombatVisualChildren(Transform sourceRoot)
+    {
+        int clonedCount = 0;
+
+        for (int i = 0; i < sourceRoot.childCount; i++)
+        {
+            Transform sourceChild = sourceRoot.GetChild(i);
+            if (!IsCombatVisualRoot(sourceChild))
+                continue;
+
+            GameObject clone = Instantiate(sourceChild.gameObject, transform);
+            clone.name = sourceChild.name;
+            clone.transform.localPosition = sourceChild.localPosition;
+            clone.transform.localRotation = sourceChild.localRotation;
+            clone.transform.localScale = sourceChild.localScale;
+            SetHierarchyActive(clone.transform, true);
+            spawnedVisuals.Add(clone);
+            clonedCount++;
+        }
+
+        return clonedCount;
+    }
+
+    private static bool HasCombatVisual(Transform root)
+    {
+        if (root == null)
+            return false;
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (IsCombatVisualRoot(child))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsCombatVisualRoot(Transform target)
+    {
+        if (target == null)
+            return false;
+
+        string lowerName = target.name.ToLowerInvariant();
+        if (lowerName.Contains("canvas") ||
+            lowerName.Contains("health") ||
+            lowerName.Contains("bar") ||
+            lowerName.Contains("badge") ||
+            lowerName.Contains("selection") ||
+            lowerName.Contains("ring") ||
+            lowerName.Contains("firepoint") ||
+            lowerName.Contains("muzzle") ||
+            lowerName.Contains("bullet") ||
+            lowerName.Contains("shadow"))
+        {
+            return false;
+        }
+
+        if (target.GetComponent<UnitController>() != null ||
+            target.GetComponent<FormationController>() != null ||
+            target.GetComponent<Canvas>() != null ||
+            target.GetComponent<RectTransform>() != null)
+        {
+            return false;
+        }
+
+        if (lowerName.StartsWith("soldier") ||
+            lowerName.Contains("asker"))
+        {
+            return true;
+        }
+
+        if (target.GetComponentInChildren<Animator>(true) != null)
+            return true;
+
+        if (target.GetComponentInChildren<SkinnedMeshRenderer>(true) != null)
+            return true;
+
+        MeshRenderer[] renderers = target.GetComponentsInChildren<MeshRenderer>(true);
+        foreach (MeshRenderer renderer in renderers)
+        {
+            if (renderer == null)
+                continue;
+
+            if (renderer.GetComponentInParent<Canvas>() != null ||
+                renderer.GetComponentInParent<RectTransform>() != null)
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 }

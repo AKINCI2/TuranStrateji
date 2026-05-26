@@ -34,21 +34,21 @@ public class GameModeManager : MonoBehaviour
     public float cameraLerpSpeed = 8f;
     public float maxCameraTransitionSeconds = 1.2f;
     public bool autoFrameWorldGrid = true;
-    public Vector3 worldCameraOffset = new Vector3(-42f, 58f, -42f);
+    public Vector3 worldCameraOffset = new Vector3(0f, 42f, -34f);
     public bool autoFrameBaseRoot = true;
     public bool autoNormalizeBaseLayout = true;
-    public Vector3 baseCameraOffset = new Vector3(-3.2f, 4.2f, -3.2f);
-    public float baseCameraHeightPadding = 1.65f;
+    public Vector3 baseCameraOffset = new Vector3(0f, 5.2f, -4.7f);
+    public float baseCameraHeightPadding = 2.05f;
     public float minBaseCameraDistance = 3.1f;
     public float maxBaseCameraDistance = 8.5f;
     public float baseCameraFieldOfView = 44f;
-    public float worldCameraFieldOfView = 60f;
+    public float worldCameraFieldOfView = 52f;
 
     [Header("Base Layout")]
-    public Vector3 headquartersBasePosition = new Vector3(0f, 0f, 1.55f);
-    public Vector3 barracksBasePosition = new Vector3(-2.65f, 0f, -2.35f);
-    public Vector3 productionBasePosition = new Vector3(2.65f, 0f, -2.35f);
-    public float baseInteriorHexFillRatio = 0.96f;
+    public Vector3 headquartersBasePosition = new Vector3(0f, 0f, 1.35f);
+    public Vector3 barracksBasePosition = new Vector3(-1.9f, 0f, -1.45f);
+    public Vector3 productionBasePosition = new Vector3(1.9f, 0f, -1.45f);
+    public float baseInteriorHexFillRatio = 1.28f;
 
     public GameViewMode CurrentMode { get; private set; } = GameViewMode.WorldMap;
     public bool IsCameraTransitionActive => cameraTransitionActive;
@@ -181,6 +181,44 @@ public class GameModeManager : MonoBehaviour
         }
 
         EnterWorldMap(preserveCameraFrame);
+    }
+
+    public void FocusWorldCameraOnPlayerBase(bool closeView = true)
+    {
+        WorldBaseMarker marker = WorldBaseMarker.FindPrimary(true);
+        if (marker == null || mainCamera == null)
+            return;
+
+        if (CurrentMode != GameViewMode.WorldMap)
+            SetMode(GameViewMode.WorldMap, false);
+
+        HexGridManager grid = FindAnyObjectByType<HexGridManager>();
+        Vector3 target = marker.transform.position;
+        Vector3 direction = worldCameraOffset.normalized;
+        if (direction == Vector3.zero)
+            direction = new Vector3(0f, 0.78f, -0.62f).normalized;
+
+        float footprint = grid != null ? Mathf.Max(GetWorldHexFootprint(), grid.size) : 1.7f;
+        float distance = closeView
+            ? Mathf.Clamp(footprint * 13f, 18f, 28f)
+            : Mathf.Clamp(footprint * 24f, 34f, 52f);
+
+        Vector3 cameraPosition = target + direction * distance;
+
+        if (grid != null)
+            ConfigureCameraWorldBounds(grid, cameraPosition);
+        else
+            worldCameraAnchor.position = cameraPosition;
+
+        cameraPosition = worldCameraAnchor != null ? worldCameraAnchor.position : cameraPosition;
+        Quaternion rotation = Quaternion.LookRotation(target - cameraPosition, Vector3.up);
+
+        targetCamPos = cameraPosition;
+        targetCamRot = rotation;
+        hasCameraTarget = true;
+        cameraTransitionActive = true;
+        cameraTransitionTimer = 0f;
+        ApplyCameraFieldOfView(GameViewMode.WorldMap);
     }
 
     public void EnterWorldMap(bool preserveCameraFrame)
@@ -334,22 +372,27 @@ public class GameModeManager : MonoBehaviour
 
     private void ApplyProfessionalCameraTuning()
     {
-        headquartersBasePosition = new Vector3(0f, 0f, 1.55f);
-        barracksBasePosition = new Vector3(-2.65f, 0f, -2.35f);
-        productionBasePosition = new Vector3(2.65f, 0f, -2.35f);
+        headquartersBasePosition = new Vector3(0f, 0f, 1.35f);
+        barracksBasePosition = new Vector3(-1.9f, 0f, -1.45f);
+        productionBasePosition = new Vector3(1.9f, 0f, -1.45f);
+        baseInteriorHexFillRatio = Mathf.Clamp(baseInteriorHexFillRatio, 1.18f, 1.45f);
 
-        baseCameraHeightPadding = Mathf.Clamp(baseCameraHeightPadding, 1.45f, 2.15f);
+        baseCameraHeightPadding = Mathf.Clamp(baseCameraHeightPadding, 1.85f, 2.45f);
 
-        minBaseCameraDistance = Mathf.Clamp(minBaseCameraDistance, 2.6f, 4.4f);
+        minBaseCameraDistance = Mathf.Clamp(minBaseCameraDistance, 4.2f, 6.2f);
 
-        maxBaseCameraDistance = Mathf.Clamp(maxBaseCameraDistance, 6.5f, 12f);
+        maxBaseCameraDistance = Mathf.Clamp(maxBaseCameraDistance, 9f, 16f);
         if (maxBaseCameraDistance < minBaseCameraDistance + 2.4f)
             maxBaseCameraDistance = minBaseCameraDistance + 2.4f;
 
-        baseCameraFieldOfView = Mathf.Clamp(baseCameraFieldOfView, 40f, 48f);
+        baseCameraFieldOfView = Mathf.Clamp(baseCameraFieldOfView, 38f, 44f);
+        worldCameraFieldOfView = Mathf.Clamp(worldCameraFieldOfView, 50f, 56f);
+
+        if (worldCameraOffset.magnitude < 20f || worldCameraOffset.magnitude > 70f)
+            worldCameraOffset = new Vector3(0f, 42f, -34f);
 
         if (baseCameraOffset.magnitude < 2.6f || baseCameraOffset.magnitude > 10f)
-            baseCameraOffset = new Vector3(-3.2f, 4.2f, -3.2f);
+            baseCameraOffset = new Vector3(0f, 5.2f, -4.7f);
     }
 
     private void EnsureCameraAnchors()
@@ -564,35 +607,74 @@ public class GameModeManager : MonoBehaviour
         if (worldCameraAnchor == null)
             worldCameraAnchor = CreateAnchor("WorldCameraAnchor_Auto", Vector3.zero, Quaternion.identity);
 
-        WorldBaseMarker marker = WorldBaseMarker.FindPrimary(true);
-        if (marker != null)
-        {
-            Vector3 baseCenter = marker.transform.position;
-            Vector3 baseDirection = worldCameraOffset.normalized;
-            if (baseDirection == Vector3.zero)
-                baseDirection = new Vector3(-0.48f, 0.72f, -0.48f).normalized;
-
-            float baseDistance = Mathf.Clamp(GetWorldHexFootprint() * 7.5f, 10f, 22f);
-            Vector3 baseCameraPos = baseCenter + baseDirection * baseDistance;
-
-            worldCameraAnchor.position = baseCameraPos;
-            worldCameraAnchor.rotation = Quaternion.LookRotation(baseCenter - baseCameraPos, Vector3.up);
-            return;
-        }
-
-        Bounds bounds = GetRootBounds(grid.gameObject);
+        Bounds bounds = GetHexGridBounds(grid);
         Vector3 center = bounds.center;
+        center.y = 0f;
 
         Vector3 direction = worldCameraOffset.normalized;
         if (direction == Vector3.zero)
             direction = new Vector3(-0.48f, 0.72f, -0.48f).normalized;
 
         float footprint = Mathf.Max(bounds.size.x, bounds.size.z);
-        float distance = Mathf.Clamp(footprint * 0.62f, 34f, 92f);
+        float distance = Mathf.Clamp(footprint * 0.58f, 36f, 96f);
         Vector3 cameraPos = center + direction * distance;
 
-        worldCameraAnchor.position = cameraPos;
+        ConfigureCameraWorldBounds(grid, cameraPos);
+        cameraPos = worldCameraAnchor.position;
         worldCameraAnchor.rotation = Quaternion.LookRotation(center - cameraPos, Vector3.up);
+    }
+
+    private void ConfigureCameraWorldBounds(HexGridManager grid, Vector3 cameraPosition)
+    {
+        if (grid == null || mainCamera == null)
+            return;
+
+        CameraController controller = mainCamera.GetComponent<CameraController>();
+        if (controller == null)
+            return;
+
+        Bounds bounds = GetHexGridBounds(grid);
+        float pad = -Mathf.Max(14f, GetWorldHexFootprint() * 9f);
+        controller.SetWorldBounds(bounds, pad);
+
+        Vector3 clamped = controller.ClampWorldPosition(cameraPosition);
+        worldCameraAnchor.position = clamped;
+    }
+
+    private Bounds GetHexGridBounds(HexGridManager grid)
+    {
+        if (grid == null)
+            return new Bounds(Vector3.zero, Vector3.one * 8f);
+
+        if (grid.allHexCells == null || grid.allHexCells.Count == 0)
+            return GetRootBounds(grid.gameObject);
+
+        bool hasCells = false;
+        Bounds bounds = new Bounds(grid.transform.position, Vector3.one * Mathf.Max(1f, grid.size));
+
+        for (int i = 0; i < grid.allHexCells.Count; i++)
+        {
+            HexCell cell = grid.allHexCells[i];
+            if (cell == null)
+                continue;
+
+            if (!hasCells)
+            {
+                bounds = new Bounds(cell.transform.position, Vector3.one * Mathf.Max(1f, grid.size));
+                hasCells = true;
+            }
+            else
+            {
+                bounds.Encapsulate(cell.transform.position);
+            }
+        }
+
+        if (!hasCells)
+            return GetRootBounds(grid.gameObject);
+
+        float expand = Mathf.Max(4f, GetWorldHexFootprint() * 2f);
+        bounds.Expand(new Vector3(expand, 0f, expand));
+        return bounds;
     }
 
     private Bounds GetBaseContentBounds()
@@ -699,13 +781,13 @@ public class GameModeManager : MonoBehaviour
 
     private float GetBaseLayoutMultiplier()
     {
-        return Mathf.Max(0.22f, GetBaseFootprintSize() / 8.8f);
+        return Mathf.Max(0.42f, GetBaseFootprintSize() / 7.2f);
     }
 
     private float GetBaseFootprintSize()
     {
         float oneHexFootprint = GetWorldHexFootprint();
-        return Mathf.Max(1.45f, oneHexFootprint * baseInteriorHexFillRatio * GetBaseExpansionStage());
+        return Mathf.Max(3.2f, oneHexFootprint * baseInteriorHexFillRatio * GetBaseExpansionStage());
     }
 
     public float GetCurrentBaseFootprintSize()
@@ -728,20 +810,20 @@ public class GameModeManager : MonoBehaviour
         float footprint = GetBaseFootprintSize();
 
         if (type == BuildingType.Headquarters)
-            return Mathf.Clamp(footprint * 0.86f, 1.05f, 3.8f);
+            return Mathf.Clamp(footprint * 0.56f, 1.35f, 3.2f);
 
         if (type == BuildingType.Barracks)
-            return Mathf.Clamp(footprint * 0.42f, 0.54f, 1.85f);
+            return Mathf.Clamp(footprint * 0.24f, 0.72f, 1.25f);
 
         if (type == BuildingType.ProductionFacility)
-            return Mathf.Clamp(footprint * 0.42f, 0.54f, 1.85f);
+            return Mathf.Clamp(footprint * 0.28f, 0.78f, 1.45f);
 
         return Mathf.Clamp(footprint * 0.38f, 0.48f, 1.7f);
     }
 
     public float GetSuggestedBaseUnitScale()
     {
-        return Mathf.Clamp(GetBaseFootprintSize() * 0.11f, 0.20f, 0.42f);
+        return Mathf.Clamp(GetBaseFootprintSize() * 0.14f, 0.38f, 0.72f);
     }
 
     private float GetWorldHexFootprint()
@@ -813,11 +895,28 @@ public class GameModeManager : MonoBehaviour
         if (renderers == null || renderers.Length == 0)
             return new Bounds(root.transform.position, Vector3.one * 8f);
 
-        Bounds bounds = renderers[0].bounds;
-        for (int i = 1; i < renderers.Length; i++)
+        bool hasBounds = false;
+        Bounds bounds = new Bounds(root.transform.position, Vector3.one);
+        for (int i = 0; i < renderers.Length; i++)
         {
+            if (renderers[i] == null ||
+                renderers[i].GetComponentInParent<WorldMapCloudMask>() != null)
+            {
+                continue;
+            }
+
+            if (!hasBounds)
+            {
+                bounds = renderers[i].bounds;
+                hasBounds = true;
+                continue;
+            }
+
             bounds.Encapsulate(renderers[i].bounds);
         }
+
+        if (!hasBounds)
+            return new Bounds(root.transform.position, Vector3.one * 8f);
 
         return bounds;
     }

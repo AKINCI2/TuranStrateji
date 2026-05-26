@@ -13,6 +13,9 @@ public class WorldCityData : ScriptableObject
     public int influenceRadius = 4;
     public float occupationSeconds = 180f;
     public GameObject cityPrefab;
+    public GameObject cityMapPrefab;
+    public string cityMapSceneName;
+    public bool useAsyncSceneLoading;
 
     [Header("Requirements")]
     public int requiredAllianceLevel = 1;

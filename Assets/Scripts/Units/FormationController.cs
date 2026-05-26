@@ -38,6 +38,7 @@ public class FormationController : MonoBehaviour
         gridManager =
             FindAnyObjectByType<HexGridManager>();
 
+        RebuildSoldiersFromChildren(false);
         CalculateSafeRadius();
         CreateOffsets();
 
@@ -67,6 +68,8 @@ public class FormationController : MonoBehaviour
 
     public void SetVisibleSoldierCount(int count)
     {
+        RebuildSoldiersFromChildren(false);
+
         int visibleCount = Mathf.Clamp(count, 0, soldiers.Count);
 
         for (int i = 0; i < soldiers.Count; i++)
@@ -75,6 +78,85 @@ public class FormationController : MonoBehaviour
             if (soldier != null)
                 soldier.gameObject.SetActive(i < visibleCount);
         }
+    }
+
+    public void RebuildSoldiersFromChildren(bool force)
+    {
+        if (soldiers == null)
+            soldiers = new List<Transform>();
+
+        soldiers.RemoveAll(item => item == null);
+
+        if (!force && soldiers.Count > 0)
+            return;
+
+        soldiers.Clear();
+
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            if (IsSoldierVisualRoot(child))
+                soldiers.Add(child);
+        }
+
+        maxSoldiers = Mathf.Max(maxSoldiers, soldiers.Count);
+        CalculateSafeRadius();
+        CreateOffsets();
+    }
+
+    private bool IsSoldierVisualRoot(Transform target)
+    {
+        if (target == null)
+            return false;
+
+        string lowerName = target.name.ToLowerInvariant();
+        if (lowerName.Contains("canvas") ||
+            lowerName.Contains("health") ||
+            lowerName.Contains("bar") ||
+            lowerName.Contains("badge") ||
+            lowerName.Contains("selection") ||
+            lowerName.Contains("ring") ||
+            lowerName.Contains("firepoint") ||
+            lowerName.Contains("muzzle") ||
+            lowerName.Contains("bullet"))
+        {
+            return false;
+        }
+
+        if (target.GetComponent<Canvas>() != null ||
+            target.GetComponent<RectTransform>() != null)
+        {
+            return false;
+        }
+
+        if (lowerName.StartsWith("soldier") ||
+            lowerName.Contains("asker"))
+        {
+            return true;
+        }
+
+        if (target.GetComponentInChildren<Animator>(true) != null)
+            return true;
+
+        if (target.GetComponentInChildren<SkinnedMeshRenderer>(true) != null)
+            return true;
+
+        MeshRenderer[] renderers = target.GetComponentsInChildren<MeshRenderer>(true);
+        foreach (MeshRenderer renderer in renderers)
+        {
+            if (renderer == null)
+                continue;
+
+            if (renderer.GetComponentInParent<Canvas>() != null ||
+                renderer.GetComponentInParent<RectTransform>() != null)
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
     }
 
     // =================================================
@@ -308,6 +390,8 @@ public class FormationController : MonoBehaviour
         List<Transform> enemySoldiers =
             enemyFormation.soldiers;
 
+        enemySoldiers.RemoveAll(item => item == null || !item.gameObject.activeInHierarchy);
+
         foreach (Transform soldier in soldiers)
         {
             if (soldier == null)
@@ -349,6 +433,9 @@ public class FormationController : MonoBehaviour
             // =========================================
             // BULLET
             // =========================================
+
+            if (bulletPrefab == null)
+                continue;
 
             GameObject bullet =
                 Instantiate(

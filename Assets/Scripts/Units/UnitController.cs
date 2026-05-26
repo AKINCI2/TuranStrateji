@@ -45,6 +45,7 @@ public HexCell currentHex;
     {
         RefreshVisualFromData();
         EnsureOfficerBadge();
+        ApplyRuntimeStatsFromData();
 
         if (UnitManager.Instance != null)
         {
@@ -63,9 +64,36 @@ public HexCell currentHex;
     public void SetUnitData(TuranUnitData newUnitData, bool rebuildVisual = true)
     {
         unitData = newUnitData;
+        ApplyRuntimeStatsFromData();
 
         if (rebuildVisual)
             RefreshVisualFromData();
+    }
+
+    void OnDestroy()
+    {
+        if (currentHex != null)
+            currentHex.OnUnitExit();
+
+        if (UnitManager.Instance != null)
+            UnitManager.Instance.UnregisterUnit(this);
+    }
+
+    private void ApplyRuntimeStatsFromData()
+    {
+        if (unitData == null)
+            return;
+
+        if (unitData.marchSpeed > 0)
+            moveSpeed = unitData.marchSpeed;
+
+        Health health = GetComponent<Health>();
+        if (health != null)
+            health.ApplyStatsFromData();
+
+        UnitCombatController combat = GetComponent<UnitCombatController>();
+        if (combat != null)
+            combat.ApplyStatsFromData();
     }
 
     public void RefreshVisualFromData()
@@ -193,6 +221,7 @@ public HexCell currentHex;
 
         transform.position = worldPosition;
         transform.localScale = Vector3.one;
+        RefreshVisualFromData();
 
         isInitialized = false;
         isHexAssigned = false;
@@ -243,6 +272,7 @@ public HexCell currentHex;
         transform.localScale = Vector3.one * baseScale;
         gameObject.SetActive(true);
         SetChildrenActive(true);
+        RefreshVisualFromData();
     }
 
     public void MoveToBaseAndRecall()

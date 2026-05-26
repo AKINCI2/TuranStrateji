@@ -15,6 +15,9 @@ public class UnitCombat : MonoBehaviour
     void Start()
     {
         unit = GetComponent<UnitController>();
+
+        if (GetComponent<UnitCombatController>() != null)
+            enabled = false;
     }
 
     [System.Obsolete]
@@ -54,6 +57,17 @@ public class UnitCombat : MonoBehaviour
 
     void FindTarget()
     {
+        if (UnitManager.Instance != null)
+        {
+            UnitController nearest =
+                UnitManager.Instance.GetNearestHostile(unit, detectionRange);
+
+            if (nearest != null)
+                target = nearest.transform;
+
+            return;
+        }
+
         GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
 
         float min = Mathf.Infinity;

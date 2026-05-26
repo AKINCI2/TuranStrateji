@@ -16,6 +16,7 @@ public class WorldCityPanelUI : MonoBehaviour
     private Image progressFill;
     private Button occupyButton;
     private Button supportButton;
+    private Button enterButton;
     private Button closeButton;
     private WorldCityNode selectedCity;
 
@@ -102,9 +103,10 @@ public class WorldCityPanelUI : MonoBehaviour
         progressFill = progressFillObject.GetComponent<Image>();
         progressFill.color = new Color(0.90f, 0.70f, 0.22f, 0.95f);
 
-        occupyButton = CreateButton("OccupyButton", "Isgal Et", panel, new Vector2(446f, -30f), new Vector2(142f, 36f), OnOccupyPressed);
-        supportButton = CreateButton("SupportButton", "Destek", panel, new Vector2(446f, -78f), new Vector2(142f, 36f), OnSupportPressed);
-        closeButton = CreateButton("CloseButton", "Kapat", panel, new Vector2(446f, -126f), new Vector2(142f, 30f), Hide);
+        enterButton = CreateButton("EnterButton", "Sehre Gir", panel, new Vector2(446f, -22f), new Vector2(142f, 32f), OnEnterPressed);
+        occupyButton = CreateButton("OccupyButton", "Isgal Et", panel, new Vector2(446f, -62f), new Vector2(142f, 32f), OnOccupyPressed);
+        supportButton = CreateButton("SupportButton", "Destek", panel, new Vector2(446f, -102f), new Vector2(142f, 32f), OnSupportPressed);
+        closeButton = CreateButton("CloseButton", "Kapat", panel, new Vector2(446f, -142f), new Vector2(142f, 28f), Hide);
     }
 
     private void Refresh()
@@ -137,6 +139,10 @@ public class WorldCityPanelUI : MonoBehaviour
         occupyButton.interactable =
             selectedCity.occupationState != AllianceOccupationState.Occupied ||
             selectedCity.controllingAllianceId != PlayerAllianceId;
+
+        if (enterButton != null)
+            enterButton.interactable = selectedCity.GetCityMapPrefab() != null ||
+                (selectedCity.useAsyncSceneLoading && !string.IsNullOrWhiteSpace(selectedCity.cityMapSceneName));
     }
 
     private void OnOccupyPressed()
@@ -156,6 +162,15 @@ public class WorldCityPanelUI : MonoBehaviour
 
         selectedCity.SetStationedMemberCount(selectedCity.stationedMemberCount + 1);
         Refresh();
+    }
+
+    private void OnEnterPressed()
+    {
+        if (selectedCity == null)
+            return;
+
+        selectedCity.EnterCityMap();
+        Hide();
     }
 
     private TMP_Text CreateText(

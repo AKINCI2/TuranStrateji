@@ -9,6 +9,7 @@ public class GameUI : MonoBehaviour
     public GameObject enterBaseButton;
     public GameObject backToMapButton;
     public GameObject recallUnitsButton;
+    public GameObject homeBaseButton;
 
     private HexSelector selector;
     private WorldBaseSelector worldBaseSelector;
@@ -43,6 +44,15 @@ public class GameUI : MonoBehaviour
         if (GetComponent<WorldCityPanelUI>() == null)
             gameObject.AddComponent<WorldCityPanelUI>();
 
+        if (FindAnyObjectByType<TuranMapLayerManager>() == null)
+            TuranMapLayerManager.EnsureInstance();
+
+        if (FindAnyObjectByType<WarpathZoomLayerController>() == null)
+            WarpathZoomLayerController.EnsureInstance();
+
+        if (FindAnyObjectByType<WorldMapStrategicMarkerManager>() == null)
+            new GameObject("WorldMapStrategicMarkerManager").AddComponent<WorldMapStrategicMarkerManager>();
+
         if (FindAnyObjectByType<PlayerRosterManager>() == null)
             new GameObject("PlayerRosterManager").AddComponent<PlayerRosterManager>();
 
@@ -51,6 +61,9 @@ public class GameUI : MonoBehaviour
 
         if (FindAnyObjectByType<ProductionFacilityManager>() == null)
             new GameObject("ProductionFacilityManager").AddComponent<ProductionFacilityManager>();
+
+        if (FindAnyObjectByType<GameSaveManager>() == null)
+            new GameObject("GameSaveManager").AddComponent<GameSaveManager>();
 
         if (FindAnyObjectByType<WorldResourceNodeManager>() == null)
         {
@@ -253,6 +266,19 @@ public class GameUI : MonoBehaviour
         if (worldBaseSelector != null) worldBaseSelector.ClearSelection();
     }
 
+    public void OnHomeBasePressed()
+    {
+        if (gameMode == null)
+            gameMode = FindAnyObjectByType<GameModeManager>();
+
+        WorldBaseMarker marker = WorldBaseMarker.FindPrimary(true);
+        if (worldBaseSelector != null && marker != null)
+            worldBaseSelector.SelectMarker(marker);
+
+        if (gameMode != null)
+            gameMode.FocusWorldCameraOnPlayerBase(true);
+    }
+
     private void SetupModeButtons()
     {
         enterBaseButton = EnsureButton(
@@ -285,9 +311,20 @@ public class GameUI : MonoBehaviour
             OnRecallUnitsPressed
         );
 
+        homeBaseButton = EnsureButton(
+            homeBaseButton,
+            "HomeBaseButton",
+            "Us",
+            new Vector2(0f, 0.5f),
+            new Vector2(16f, -74f),
+            new Vector2(58f, 34f),
+            OnHomeBasePressed
+        );
+
         if (enterBaseButton != null) enterBaseButton.SetActive(false);
         if (backToMapButton != null) backToMapButton.SetActive(false);
         if (recallUnitsButton != null) recallUnitsButton.SetActive(false);
+        if (homeBaseButton != null) homeBaseButton.SetActive(false);
     }
 
     private void HookModeEvents()
@@ -316,6 +353,7 @@ public class GameUI : MonoBehaviour
 
         if (enterBaseButton != null) enterBaseButton.SetActive(isWorldMode && hasSelectedWorldBase);
         if (backToMapButton != null) backToMapButton.SetActive(isBaseMode);
+        if (homeBaseButton != null) homeBaseButton.SetActive(isWorldMode);
 
         bool hasWorldUnits = UnitManager.Instance != null && UnitManager.Instance.HasWorldMapUnits();
         if (recallUnitsButton != null) recallUnitsButton.SetActive(isWorldMode && hasSelectedWorldBase && hasWorldUnits);

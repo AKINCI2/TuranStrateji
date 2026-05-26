@@ -12,7 +12,7 @@ public class Health : MonoBehaviour
 
     void Start()
     {
-        currentHealth = maxHealth;
+        ApplyStatsFromData(true);
 
         FormationController formation =
             GetComponent<FormationController>();
@@ -30,6 +30,30 @@ public class Health : MonoBehaviour
                 " Health başlatıldı"
             );
         }
+    }
+
+    public void ApplyStatsFromData(bool refill = false)
+    {
+        UnitController unit = GetComponent<UnitController>();
+        if (unit == null || unit.unitData == null || unit.unitData.health <= 0)
+        {
+            if (refill || currentHealth <= 0)
+                currentHealth = maxHealth;
+
+            return;
+        }
+
+        int previousMaxHealth = Mathf.Max(1, maxHealth);
+        float healthRatio = currentHealth > 0
+            ? Mathf.Clamp01((float)currentHealth / previousMaxHealth)
+            : 1f;
+
+        maxHealth = unit.unitData.health;
+
+        if (refill || currentHealth <= 0)
+            currentHealth = maxHealth;
+        else
+            currentHealth = Mathf.Clamp(Mathf.RoundToInt(maxHealth * healthRatio), 1, maxHealth);
     }
 
     // =================================================
@@ -62,19 +86,24 @@ public class Health : MonoBehaviour
         if (formation != null)
         {
             int currentSoldierCount =
-                Mathf.CeilToInt(
+                Mathf.Clamp(
+                    Mathf.CeilToInt(
                     (float)currentHealth /
                     maxHealth *
+                    formation.maxSoldiers
+                    ),
+                    0,
                     formation.maxSoldiers
                 );
 
             if (currentSoldierCount <
                 lastSoldierCount)
             {
-                formation.KillSoldier();
-
-                lastSoldierCount =
-                    currentSoldierCount;
+                while (lastSoldierCount > currentSoldierCount)
+                {
+                    formation.KillSoldier();
+                    lastSoldierCount--;
+                }
             }
         }
 

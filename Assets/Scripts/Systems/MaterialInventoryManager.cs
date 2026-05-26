@@ -48,6 +48,26 @@ public class MaterialInventoryManager : MonoBehaviour
         InventoryChanged?.Invoke();
     }
 
+    public void SetValues(
+        int wood,
+        int concrete,
+        int cement,
+        int brick,
+        int mergeCoupons,
+        int speedupsMinutes,
+        int rewardChests)
+    {
+        this.wood = Mathf.Max(0, wood);
+        this.concrete = Mathf.Max(0, concrete);
+        this.cement = Mathf.Max(0, cement);
+        this.brick = Mathf.Max(0, brick);
+        this.mergeCoupons = Mathf.Max(0, mergeCoupons);
+        this.speedupsMinutes = Mathf.Max(0, speedupsMinutes);
+        this.rewardChests = Mathf.Max(0, rewardChests);
+
+        InventoryChanged?.Invoke();
+    }
+
     public string GetDisplayText()
     {
         return

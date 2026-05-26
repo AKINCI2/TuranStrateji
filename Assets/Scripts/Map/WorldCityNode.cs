@@ -35,6 +35,13 @@ public class WorldCityNode : MonoBehaviour
     public Transform visualRoot;
     public GameObject runtimeVisual;
 
+    [Header("City Map Entry")]
+    public GameObject cityMapPrefab;
+    public string cityMapSceneName;
+    public bool useAsyncSceneLoading;
+    public Transform cityMapFocusPoint;
+    public Transform cityMapCameraAnchor;
+
     private readonly List<HexCell> influenceHexes = new List<HexCell>();
     private HexCell cityHex;
     private HexGridManager gridManager;
@@ -189,6 +196,24 @@ public class WorldCityNode : MonoBehaviour
         requiredPower = data.requiredPower;
         bonusType = data.bonusType;
         bonusPercent = data.bonusPercent;
+        cityMapPrefab = data.cityMapPrefab;
+        cityMapSceneName = data.cityMapSceneName;
+        useAsyncSceneLoading = data.useAsyncSceneLoading;
+    }
+
+    public GameObject GetCityMapPrefab()
+    {
+        if (cityMapPrefab != null)
+            return cityMapPrefab;
+
+        return data != null ? data.cityMapPrefab : null;
+    }
+
+    public void EnterCityMap()
+    {
+        TuranMapLayerManager manager = TuranMapLayerManager.EnsureInstance();
+        if (manager != null)
+            manager.EnterCityMap(this);
     }
 
     public void RefreshVisual()

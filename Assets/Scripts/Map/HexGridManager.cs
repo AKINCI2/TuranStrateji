@@ -46,6 +46,7 @@ public class HexGridManager : MonoBehaviour
             Debug.Log($"Grid oluÅŸturuldu: {allHexCells.Count} hex hÃ¼cresi");
 
         EnsureTerrainCover();
+        EnsureCloudMask();
         EnsureSampleCities();
     }
 
@@ -443,9 +444,20 @@ public class HexGridManager : MonoBehaviour
         GenerateGrid();
         AssignNeighbors();
         EnsureTerrainCover();
+        EnsureCloudMask();
 
         if (showDebugLogs)
             Debug.Log("ğŸ”„ Grid yeniden oluÅŸturuldu!");
+    }
+
+    private void EnsureCloudMask()
+    {
+        WorldMapCloudMask cloudMask = GetComponent<WorldMapCloudMask>();
+        if (cloudMask == null)
+            cloudMask = gameObject.AddComponent<WorldMapCloudMask>();
+
+        cloudMask.grid = this;
+        cloudMask.Rebuild();
     }
 }
 
