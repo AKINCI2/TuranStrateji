@@ -29,6 +29,7 @@ public class WarpathZoomLayerController : MonoBehaviour
     [Header("Camera Framing")]
     public bool centerOnPlayerBaseAtStart = false;
     public bool autoEnterBaseInterior = false;
+    public bool allowBaseInteriorAutoExit = false;
     public Vector3 startCameraOffset = new Vector3(0f, 42f, -34f);
     public float startFieldOfView = 52f;
     public float layerSmoothSeconds = 0.24f;
@@ -56,6 +57,7 @@ public class WarpathZoomLayerController : MonoBehaviour
         TuneCameraController();
         centerOnPlayerBaseAtStart = false;
         autoEnterBaseInterior = false;
+        allowBaseInteriorAutoExit = false;
 
         if (centerOnPlayerBaseAtStart)
             FramePlayerBase(false);
@@ -162,7 +164,7 @@ public class WarpathZoomLayerController : MonoBehaviour
         cameraController.minY = Mathf.Min(cameraController.minY, 6.5f);
         cameraController.maxY = Mathf.Max(cameraController.maxY, 82f);
         cameraController.baseEnterHeight = baseEnterHeight;
-        cameraController.baseExitHeight = baseExitHeight;
+        cameraController.baseExitHeight = allowBaseInteriorAutoExit ? baseExitHeight : 999f;
         cameraController.baseEnterRadius = baseEnterRadius;
     }
 
@@ -242,6 +244,9 @@ public class WarpathZoomLayerController : MonoBehaviour
 
     private void HandleBaseInteriorAutoExit()
     {
+        if (!allowBaseInteriorAutoExit)
+            return;
+
         if (gameModeManager == null ||
             gameModeManager.CurrentMode != GameViewMode.BaseView ||
             mainCamera == null)

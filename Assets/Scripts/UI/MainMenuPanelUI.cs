@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class MainMenuPanelUI : MonoBehaviour
@@ -50,6 +51,8 @@ public class MainMenuPanelUI : MonoBehaviour
         if (canvas == null)
             return;
 
+        EnsureEventSystem();
+        EnsureGraphicRaycaster(canvas);
         EnsureConstructionManager();
         playerProfileUI = FindAnyObjectByType<PlayerProfileUI>();
         BuildMenu();
@@ -1563,7 +1566,10 @@ public class MainMenuPanelUI : MonoBehaviour
     {
         Canvas parentCanvas = GetComponentInParent<Canvas>();
         if (parentCanvas != null && parentCanvas.renderMode != RenderMode.WorldSpace)
+        {
+            EnsureGraphicRaycaster(parentCanvas);
             return parentCanvas;
+        }
 
         Canvas[] canvases =
             FindObjectsByType<Canvas>(FindObjectsInactive.Exclude);
@@ -1571,16 +1577,43 @@ public class MainMenuPanelUI : MonoBehaviour
         foreach (Canvas foundCanvas in canvases)
         {
             if (foundCanvas != null && foundCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                EnsureGraphicRaycaster(foundCanvas);
                 return foundCanvas;
+            }
         }
 
         foreach (Canvas foundCanvas in canvases)
         {
             if (foundCanvas != null && foundCanvas.renderMode == RenderMode.ScreenSpaceCamera)
+            {
+                EnsureGraphicRaycaster(foundCanvas);
                 return foundCanvas;
+            }
         }
 
+        if (parentCanvas != null)
+            EnsureGraphicRaycaster(parentCanvas);
+
         return parentCanvas;
+    }
+
+    private void EnsureEventSystem()
+    {
+        if (EventSystem.current != null)
+            return;
+
+        GameObject eventSystemObject = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        EventSystem.current = eventSystemObject.GetComponent<EventSystem>();
+    }
+
+    private void EnsureGraphicRaycaster(Canvas targetCanvas)
+    {
+        if (targetCanvas == null)
+            return;
+
+        if (targetCanvas.GetComponent<GraphicRaycaster>() == null)
+            targetCanvas.gameObject.AddComponent<GraphicRaycaster>();
     }
 
     private string Stars(int count)

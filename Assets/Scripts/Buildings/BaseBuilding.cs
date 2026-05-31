@@ -84,7 +84,8 @@ public class BaseBuilding : MonoBehaviour
         float fitMultiplier = maxFootprint / currentFootprint;
 
         Transform scaleTarget = modelRoot != null ? modelRoot : transform;
-        float nextScale = Mathf.Clamp(scaleTarget.localScale.x * fitMultiplier, 0.025f, 6f);
+        float maxScale = data != null && data.type == BuildingType.Headquarters ? 18f : 10f;
+        float nextScale = Mathf.Clamp(scaleTarget.localScale.x * fitMultiplier, 0.025f, maxScale);
         scaleTarget.localScale = Vector3.one * nextScale;
     }
 
@@ -172,6 +173,26 @@ public class BaseBuilding : MonoBehaviour
         activeVisual.transform.localPosition = Vector3.zero;
         activeVisual.transform.localRotation = Quaternion.Euler(levelData.visualRotation);
         activeVisual.transform.localScale = levelData.visualScale;
+        ApplyRuntimeVisualFixes(activeVisual.transform);
+    }
+
+    private void ApplyRuntimeVisualFixes(Transform visualRoot)
+    {
+        if (visualRoot == null || data == null)
+            return;
+
+        if (data.type == BuildingType.Barracks)
+        {
+            Transform normalizedModel = visualRoot.Find("NormalizedModel");
+            if (normalizedModel != null)
+            {
+                normalizedModel.localRotation = Quaternion.identity;
+                normalizedModel.localPosition = Vector3.zero;
+            }
+        }
+
+        if (data.type == BuildingType.Headquarters)
+            visualRoot.localScale *= 2.35f;
     }
 
     private GameObject CreateFallbackVisual()

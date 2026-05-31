@@ -9,8 +9,11 @@ public class UnitVisualProfile : ScriptableObject
     public string profileId = "visual_profile_id";
     public string displayName = "Tim Gorseli";
 
-    [Header("Character / Vehicle")]
+    [Header("PRO MODEL TASARIMI (BURAYA KOYUN)")]
+    [Tooltip("Kendi oluşturduğunuz 3D asker modelini buraya sürükleyin.")]
     public GameObject characterPrefab;
+    
+    [Header("Animasyon Ayarları")]
     public Avatar humanoidAvatar;
     public RuntimeAnimatorController animatorController;
 

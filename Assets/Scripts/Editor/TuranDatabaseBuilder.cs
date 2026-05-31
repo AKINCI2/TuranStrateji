@@ -87,8 +87,10 @@ public static class TuranDatabaseBuilder
         Link(units, "bora_fuze_timi", "gokdogan_roket_timi");
         Link(units, "yolcu_lojistik_kolu", "kervan_lojistik_kolu");
 
+        List<TuranUnitData> phaseOneUnits = BuildPhaseOneCombatUnits(units);
+
         UnitCatalogData unitCatalog = LoadOrCreate<UnitCatalogData>(DatabasesRoot + "/UnitCatalog_Starter.asset");
-        unitCatalog.units = new List<TuranUnitData>(units.Values);
+        unitCatalog.units = phaseOneUnits;
         EditorUtility.SetDirty(unitCatalog);
 
         OfficerData alpArslan = CreateOfficer("alp_arslan", "Alp Arslan", OfficerLegacyType.HistoricalLeader, "Tarihi lider ruhunu temsil eden saldiri yonlu saha subayi.", TuranUnitKind.Infantry, OfficerTendency.Attack, 8, 2, 5, 0, 0);
@@ -101,13 +103,13 @@ public static class TuranDatabaseBuilder
         EditorUtility.SetDirty(officerCatalog);
 
         CreateChest("turkiye_kara_sandigi", "Turkiye Kara Sandigi", TuranNation.Turkiye, ChestsRoot + "/RC_TurkiyeKara.asset", units,
-            "bozkir_timi", "alp_timi", "boru_timi", "bozkurt_zirhli_timi", "boran_bataryasi", "sakarya_roket_timi");
+            "mpt55_timi", "sar56_timi", "mpt76_timi", "kaplan_mt_timi", "altay_timi");
         CreateChest("turan_ortak_sandigi", "Turan Ortak Sandigi", TuranNation.TuranCommon, ChestsRoot + "/RC_TuranOrtak.asset", units,
-            "alatau_timi", "istiglal_timi", "tufan_roket_timi", "kervan_lojistik_kolu", "gokboru_timi");
+            "mpt55_timi", "sar56_timi", "kaplan_mt_timi");
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
-        Debug.Log($"Turan starter database hazir: {unitCatalog.units.Count} tim, {officerCatalog.officers.Count} subay.");
+        Debug.Log($"Turan Faz 1 starter database hazir: {unitCatalog.units.Count} tim, {officerCatalog.officers.Count} subay.");
     }
 
     [DidReloadScripts]
@@ -175,6 +177,10 @@ public static class TuranDatabaseBuilder
         unit.techLine = techLine;
         unit.weaponData = CreateWeaponForUnit(id, weapon, nation, kind, era, rarity, attack, tier);
         unit.visualProfile = CreateVisualProfileForUnit(id, displayName, kind, techLine);
+        unit.unitModelPrefab = unit.unitModelPrefab != null ? unit.unitModelPrefab : unit.barracksSoldierPrefab;
+        unit.barracksVisibleSoldierCount = GetDefaultVisibleModelCount(kind);
+        unit.visibleSoldiersPerBarracksLevel = kind == TuranUnitKind.Infantry ? 2 : 0;
+        unit.barracksSoldierSpacing = kind == TuranUnitKind.Infantry ? 0.32f : 0.55f;
         unit.baseStars = stars;
         unit.tier = tier;
         unit.power = power;
@@ -189,6 +195,24 @@ public static class TuranDatabaseBuilder
         EditorUtility.SetDirty(unit);
         units[id] = unit;
         return unit;
+    }
+
+    private static List<TuranUnitData> BuildPhaseOneCombatUnits(Dictionary<string, TuranUnitData> units)
+    {
+        List<TuranUnitData> phaseOne = new List<TuranUnitData>
+        {
+            AddUnit(units, "mpt55_timi", "MPT-55 Timi", "MPT-55", TuranNation.Turkiye, TuranUnitKind.Infantry, TuranUnitEra.Modern, TuranRarity.Common, 1, 1, 95, 18, 12, 95, 4, new ResourceCost { steel = 10 }, "piyade"),
+            AddUnit(units, "sar56_timi", "SAR 56 Timi", "SAR 56", TuranNation.Turkiye, TuranUnitKind.Infantry, TuranUnitEra.Modern, TuranRarity.Uncommon, 2, 2, 145, 28, 17, 120, 4, new ResourceCost { steel = 15, oil = 1 }, "piyade"),
+            AddUnit(units, "mpt76_timi", "MPT-76 Timi", "MPT-76", TuranNation.Turkiye, TuranUnitKind.Infantry, TuranUnitEra.Modern, TuranRarity.Rare, 3, 3, 215, 42, 25, 165, 4, new ResourceCost { steel = 22, oil = 2 }, "piyade"),
+            AddUnit(units, "kaplan_mt_timi", "Kaplan MT Timi", "Kaplan MT 105 mm", TuranNation.Turkiye, TuranUnitKind.Tank, TuranUnitEra.Modern, TuranRarity.Uncommon, 3, 2, 360, 72, 62, 420, 3, new ResourceCost { steel = 62, oil = 18 }, "tank"),
+            AddUnit(units, "altay_timi", "Altay Timi", "Altay 120 mm", TuranNation.Turkiye, TuranUnitKind.Tank, TuranUnitEra.Advanced, TuranRarity.Epic, 5, 4, 660, 128, 112, 760, 3, new ResourceCost { steel = 120, oil = 38, bor = 3 }, "tank")
+        };
+
+        Link(units, "mpt55_timi", "sar56_timi");
+        Link(units, "sar56_timi", "mpt76_timi");
+        Link(units, "kaplan_mt_timi", "altay_timi");
+
+        return phaseOne;
     }
 
     private static WeaponData CreateWeaponForUnit(
@@ -284,6 +308,14 @@ public static class TuranDatabaseBuilder
         if (kind == TuranUnitKind.Tank)
             return 0.55f;
         return 1.15f;
+    }
+
+    private static int GetDefaultVisibleModelCount(TuranUnitKind kind)
+    {
+        if (kind == TuranUnitKind.Infantry)
+            return 6;
+
+        return 1;
     }
 
     private static OfficerData CreateOfficer(

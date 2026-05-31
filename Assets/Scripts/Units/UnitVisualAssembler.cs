@@ -10,30 +10,39 @@ public class UnitVisualAssembler : MonoBehaviour
 
     public void Assemble(TuranUnitData unitData)
     {
-        if (unitData == null || unitData.visualProfile == null)
+        Clear();
+        RemoveLegacyPlaceholderChildren();
+
+        if (unitData == null)
         {
             EnsureExistingChildrenVisible();
             return;
         }
 
         UnitVisualProfile profile = unitData.visualProfile;
-        GameObject characterPrefab = profile.characterPrefab;
-        if (characterPrefab == null)
-        {
-            EnsureExistingChildrenVisible();
-            return;
-        }
-
-        Clear();
-        RemoveLegacyPlaceholderChildren();
-
+        GameObject characterPrefab = unitData.unitModelPrefab != null
+            ? unitData.unitModelPrefab
+            : (unitData.barracksSoldierPrefab != null
+                ? unitData.barracksSoldierPrefab
+                : (profile != null ? profile.characterPrefab : null));
+        
         if (formationController == null)
             formationController = GetComponent<FormationController>();
 
         if (unitController == null)
             unitController = GetComponent<UnitController>();
 
-        int count = Mathf.Max(1, profile.visibleSoldierCount);
+        int barracksLevel = 1;
+        if (unitController != null && unitController.assignedBarracks != null)
+        {
+            BaseBuilding barracksBuilding = unitController.assignedBarracks.GetComponent<BaseBuilding>();
+            if (barracksBuilding != null)
+                barracksLevel = Mathf.Max(1, barracksBuilding.currentLevel);
+        }
+
+        int count = unitData.GetVisibleSoldierCountForBarracksLevel(barracksLevel);
+        if (profile != null && unitData.unitModelPrefab == null && unitData.barracksSoldierPrefab == null)
+            count = Mathf.Max(1, profile.visibleSoldierCount);
         if (unitData.kind == TuranUnitKind.Tank ||
             unitData.kind == TuranUnitKind.Artillery ||
             unitData.kind == TuranUnitKind.RocketArtillery ||
@@ -44,13 +53,24 @@ public class UnitVisualAssembler : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            GameObject visual = Instantiate(characterPrefab, transform);
-            visual.name = characterPrefab.name + "_" + (i + 1);
+            GameObject visual;
+            if (characterPrefab != null)
+            {
+                visual = Instantiate(characterPrefab, transform);
+                visual.name = characterPrefab.name + "_" + (i + 1);
+            }
+            else
+            {
+                Debug.LogWarning($"[UnitVisualAssembler] {unitData.displayName} icin model atanmamis. TuranUnitData assetinde Model Baglantilari > Unit Model Prefab alanina modeli koy. Silah modeli ayrica WeaponData > Weapon Prefab alanindadir.");
+                visual = CreatePlaceholderVisual("MissingSoldierModel_" + (i + 1));
+            }
+
             visual.transform.localPosition = Vector3.zero;
             visual.transform.localRotation = Quaternion.identity;
-            visual.transform.localScale = Vector3.one;
 
-            AttachWeapon(visual.transform, unitData.weaponData, profile);
+            if (characterPrefab != null)
+                AttachWeapon(visual.transform, unitData.weaponData, profile);
+            
             spawnedVisuals.Add(visual);
         }
 
@@ -61,78 +81,35 @@ public class UnitVisualAssembler : MonoBehaviour
                 formationController.soldiers.Add(visual.transform);
 
             formationController.maxSoldiers = count;
-            formationController.spacing = profile.spacing;
-            formationController.hexFillRatio = profile.hexFillRatio;
+            formationController.spacing = profile != null ? profile.spacing : unitData.barracksSoldierSpacing;
+            formationController.hexFillRatio = profile != null ? profile.hexFillRatio : 0.42f;
         }
     }
 
-    private void AttachWeapon(Transform visualRoot, WeaponData weaponData, UnitVisualProfile profile)
+    private GameObject CreatePlaceholderVisual(string name)
     {
-        if (visualRoot == null || weaponData == null || weaponData.weaponPrefab == null)
-            return;
-
-        Transform socket = FindSocket(visualRoot, profile);
-        if (socket == null)
-            return;
-
-        GameObject weapon = Instantiate(weaponData.weaponPrefab, socket);
-        weapon.name = weaponData.weaponPrefab.name;
-        weapon.transform.localPosition = weaponData.socketLocalPosition;
-        weapon.transform.localRotation = Quaternion.Euler(weaponData.socketLocalRotation);
-        weapon.transform.localScale = weaponData.socketLocalScale;
-    }
-
-    private Transform FindSocket(Transform visualRoot, UnitVisualProfile profile)
-    {
-        WeaponSocket[] sockets = visualRoot.GetComponentsInChildren<WeaponSocket>(true);
-        foreach (WeaponSocket socket in sockets)
+        GameObject visual = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        visual.name = name;
+        visual.transform.SetParent(transform);
+        visual.transform.localScale = new Vector3(0.4f, 0.85f, 0.4f);
+        
+        Renderer r = visual.GetComponent<Renderer>();
+        if (r != null)
         {
-            if (socket != null && socket.socketName == profile.weaponSocketName)
-                return socket.transform;
+            r.material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            r.material.color = (unitController != null && unitController.CompareTag("Enemy")) ? Color.red : Color.green;
         }
 
-        Animator animator = visualRoot.GetComponentInChildren<Animator>();
-        if (animator != null && animator.isHuman)
+        Collider c = visual.GetComponent<Collider>();
+        if (c != null)
         {
-            Transform hand = animator.GetBoneTransform(profile.fallbackHandBone);
-            if (hand != null)
-                return hand;
+            if (Application.isPlaying)
+                Destroy(c);
+            else
+                DestroyImmediate(c);
         }
 
-        return visualRoot;
-    }
-
-    public void Clear()
-    {
-        for (int i = spawnedVisuals.Count - 1; i >= 0; i--)
-        {
-            if (spawnedVisuals[i] != null)
-                Destroy(spawnedVisuals[i]);
-        }
-
-        spawnedVisuals.Clear();
-    }
-
-    private void RemoveLegacyPlaceholderChildren()
-    {
-        for (int i = transform.childCount - 1; i >= 0; i--)
-        {
-            Transform child = transform.GetChild(i);
-            if (child == null)
-                continue;
-
-            if (!child.name.StartsWith("Cube", System.StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            if (child.GetComponent<UnitController>() != null ||
-                child.GetComponent<FormationController>() != null ||
-                child.GetComponentInChildren<SkinnedMeshRenderer>(true) != null)
-            {
-                continue;
-            }
-
-            Destroy(child.gameObject);
-        }
+        return visual;
     }
 
     public void EnsureExistingChildrenVisible()
@@ -149,6 +126,13 @@ public class UnitVisualAssembler : MonoBehaviour
 
         if (!HasCombatVisual(transform))
             clonedFallback = TryCloneLooseSoldierVisuals() || clonedFallback;
+        
+        if (!HasCombatVisual(transform))
+        {
+            GameObject placeholder = CreatePlaceholderVisual("FallbackPlaceholder");
+            spawnedVisuals.Add(placeholder);
+            clonedFallback = true;
+        }
 
         if (formationController == null)
             formationController = GetComponent<FormationController>();
@@ -333,5 +317,86 @@ public class UnitVisualAssembler : MonoBehaviour
         }
 
         return false;
+    }
+
+    public void Clear()
+    {
+        for (int i = spawnedVisuals.Count - 1; i >= 0; i--)
+        {
+            if (spawnedVisuals[i] != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(spawnedVisuals[i]);
+                else
+                    DestroyImmediate(spawnedVisuals[i]);
+            }
+        }
+
+        spawnedVisuals.Clear();
+    }
+
+    private void RemoveLegacyPlaceholderChildren()
+    {
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = transform.GetChild(i);
+            if (child == null)
+                continue;
+
+            if (!child.name.StartsWith("Cube", System.StringComparison.OrdinalIgnoreCase) &&
+                !child.name.StartsWith("PlaceholderSoldier", System.StringComparison.OrdinalIgnoreCase) &&
+                !child.name.StartsWith("FallbackPlaceholder", System.StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (child.GetComponent<UnitController>() != null ||
+                child.GetComponent<FormationController>() != null ||
+                child.GetComponentInChildren<SkinnedMeshRenderer>(true) != null)
+            {
+                continue;
+            }
+
+            if (Application.isPlaying)
+                Destroy(child.gameObject);
+            else
+                DestroyImmediate(child.gameObject);
+        }
+    }
+
+    private void AttachWeapon(Transform visualRoot, WeaponData weaponData, UnitVisualProfile profile)
+    {
+        if (visualRoot == null || weaponData == null || weaponData.weaponPrefab == null)
+            return;
+
+        Transform socket = FindSocket(visualRoot, profile);
+        if (socket == null)
+            return;
+
+        GameObject weapon = Instantiate(weaponData.weaponPrefab, socket);
+        weapon.name = weaponData.weaponPrefab.name;
+        weapon.transform.localPosition = weaponData.socketLocalPosition;
+        weapon.transform.localRotation = Quaternion.Euler(weaponData.socketLocalRotation);
+        weapon.transform.localScale = weaponData.socketLocalScale;
+    }
+
+    private Transform FindSocket(Transform visualRoot, UnitVisualProfile profile)
+    {
+        WeaponSocket[] sockets = visualRoot.GetComponentsInChildren<WeaponSocket>(true);
+        foreach (WeaponSocket socket in sockets)
+        {
+            if (socket != null && (profile == null || socket.socketName == profile.weaponSocketName))
+                return socket.transform;
+        }
+
+        Animator animator = visualRoot.GetComponentInChildren<Animator>();
+        if (profile != null && animator != null && animator.isHuman)
+        {
+            Transform hand = animator.GetBoneTransform(profile.fallbackHandBone);
+            if (hand != null)
+                return hand;
+        }
+
+        return visualRoot;
     }
 }

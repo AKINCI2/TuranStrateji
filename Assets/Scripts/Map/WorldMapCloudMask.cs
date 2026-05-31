@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class WorldMapCloudMask : MonoBehaviour
@@ -5,22 +6,49 @@ public class WorldMapCloudMask : MonoBehaviour
     [Header("Target")]
     public HexGridManager grid;
     public Transform cloudRoot;
-    public float yOffset = 2.5f;
-    public float edgePadding = -1.5f;
-    public float cloudBandWidth = 44f;
+    public float yOffset = 0.18f;
+    public int initialRevealRadius = 3;
+    public int frontierFadeRadius = 1;
 
     [Header("Visual")]
-    public Color cloudColor = new Color(0.82f, 0.88f, 0.90f, 0.50f);
-    public int cloudPuffsPerSide = 0;
-    public Vector2 puffScaleRange = new Vector2(4f, 8f);
-    public bool createConnectedBands = true;
-    public bool createLoosePuffs = false;
+    public Color unexploredColor = new Color(0.78f, 0.84f, 0.86f, 0.74f);
+    public Color frontierColor = new Color(0.86f, 0.90f, 0.92f, 0.44f);
+    public float tileFillRatio = 1.02f;
     public bool rebuildOnStart = true;
+    public bool hideInBaseView = true;
+    public bool revealAllAtStart = true; // Başlangıçta tüm bulutları kaldır
+
+    [Header("Compatibility")]
+[HideInInspector] public float edgePadding = -1.5f;
+    [HideInInspector] public float cloudBandWidth = 44f;
+    [HideInInspector] public Color cloudColor = new Color(0.82f, 0.88f, 0.90f, 0.50f);
+    [HideInInspector] public int cloudPuffsPerSide = 0;
+    [HideInInspector] public Vector2 puffScaleRange = new Vector2(4f, 8f);
+    [HideInInspector] public bool createConnectedBands = true;
+    [HideInInspector] public bool createLoosePuffs = false;
+
+    private readonly HashSet<HexCell> revealedCells = new HashSet<HexCell>();
+    private readonly Dictionary<HexCell, GameObject> fogByCell = new Dictionary<HexCell, GameObject>();
+    private Material unexploredMaterial;
+    private Material frontierMaterial;
+
+    void OnEnable()
+    {
+        HookModeEvents();
+    }
 
     void Start()
     {
+        HookModeEvents();
+
         if (rebuildOnStart)
             Rebuild();
+    }
+
+    void OnDisable()
+    {
+        if (GameModeManager.Instance != null)
+            GameModeManager.Instance.ModeChanged -= OnModeChanged;
     }
 
     public void Rebuild()
@@ -28,50 +56,221 @@ public class WorldMapCloudMask : MonoBehaviour
         if (grid == null)
             grid = FindAnyObjectByType<HexGridManager>();
 
-        if (grid == null)
+        if (grid == null || grid.allHexCells == null || grid.allHexCells.Count == 0)
             return;
 
         NormalizeRuntimeSettings();
         EnsureRoot();
         ClearRoot();
-
-        Bounds bounds = GetGridBounds();
-        if (createConnectedBands)
+        EnsureMaterials();
+        
+        if (revealAllAtStart)
         {
-            CreateCloudBand("NorthBand", bounds, Vector3.forward);
-            CreateCloudBand("SouthBand", bounds, Vector3.back);
-            CreateCloudBand("EastBand", bounds, Vector3.right);
-            CreateCloudBand("WestBand", bounds, Vector3.left);
-            CreateCloudCorner("NorthEastCorner", bounds, 1f, 1f);
-            CreateCloudCorner("NorthWestCorner", bounds, -1f, 1f);
-            CreateCloudCorner("SouthEastCorner", bounds, 1f, -1f);
-            CreateCloudCorner("SouthWestCorner", bounds, -1f, -1f);
+            revealedCells.Clear();
+            foreach (HexCell cell in grid.allHexCells)
+            {
+                if (cell != null) revealedCells.Add(cell);
+            }
+        }
+        else
+        {
+            RevealInitialBaseArea();
         }
 
-        if (createLoosePuffs)
-        {
-            CreateCloudSide("North", bounds, Vector3.forward);
-            CreateCloudSide("South", bounds, Vector3.back);
-            CreateCloudSide("East", bounds, Vector3.right);
-            CreateCloudSide("West", bounds, Vector3.left);
+        for (int i = 0; i < grid.allHexCells.Count; i++)
+{
+            HexCell cell = grid.allHexCells[i];
+            if (cell == null || revealedCells.Contains(cell))
+                continue;
+
+            CreateFogHex(cell);
         }
+
+        ApplyModeVisibility();
+    }
+
+    public bool IsRevealed(HexCell cell)
+    {
+        return cell != null && revealedCells.Contains(cell);
+    }
+
+    public void RevealAroundWorldPosition(Vector3 worldPosition, int radius)
+    {
+        if (grid == null)
+            grid = FindAnyObjectByType<HexGridManager>();
+
+        if (grid == null || grid.allHexCells == null || grid.allHexCells.Count == 0)
+            return;
+
+        RevealHex(grid.GetClosestHex(worldPosition), radius);
+    }
+
+    public void RevealHex(HexCell center, int radius)
+    {
+        if (center == null || grid == null || grid.allHexCells == null)
+            return;
+
+        radius = Mathf.Max(0, radius);
+        List<HexCell> newlyRevealed = new List<HexCell>();
+
+        foreach (HexCell cell in grid.allHexCells)
+        {
+            if (cell == null || revealedCells.Contains(cell))
+                continue;
+
+            if (center.GetDistance(cell) > radius)
+                continue;
+
+            revealedCells.Add(cell);
+            newlyRevealed.Add(cell);
+        }
+
+        for (int i = 0; i < newlyRevealed.Count; i++)
+            RemoveFog(newlyRevealed[i]);
+
+        RefreshFrontierMaterials();
+    }
+
+    public void RevealByScoutPlane(Vector3 scoutWorldPosition, int radius, int rewardGold = 0)
+    {
+        int before = revealedCells.Count;
+        RevealAroundWorldPosition(scoutWorldPosition, radius);
+        int discovered = Mathf.Max(0, revealedCells.Count - before);
+
+        if (discovered <= 0 || rewardGold <= 0 || BaseManager.Instance == null)
+            return;
+
+        ResourceCost reward = new ResourceCost { gold = rewardGold * discovered };
+        BaseManager.Instance.AddResources(reward);
     }
 
     private void NormalizeRuntimeSettings()
     {
-        edgePadding = Mathf.Clamp(edgePadding, -2.5f, 0.5f);
-        cloudBandWidth = Mathf.Clamp(cloudBandWidth, 34f, 52f);
-        cloudPuffsPerSide = Mathf.Clamp(cloudPuffsPerSide, 0, 8);
-        puffScaleRange = new Vector2(
-            Mathf.Clamp(puffScaleRange.x, 2.5f, 5f),
-            Mathf.Clamp(puffScaleRange.y, 4f, 8f));
-        cloudColor = new Color(
-            Mathf.Clamp01(cloudColor.r),
-            Mathf.Clamp01(cloudColor.g),
-            Mathf.Clamp01(cloudColor.b),
-            Mathf.Clamp(cloudColor.a, 0.42f, 0.55f));
-        createConnectedBands = true;
-        createLoosePuffs = false;
+        yOffset = Mathf.Clamp(yOffset, 0.06f, 0.85f);
+        initialRevealRadius = Mathf.Clamp(initialRevealRadius, 1, 10);
+        frontierFadeRadius = Mathf.Clamp(frontierFadeRadius, 0, 3);
+        tileFillRatio = Mathf.Clamp(tileFillRatio, 1.05f, 1.25f); // Daha büyük karolar
+        unexploredColor.a = Mathf.Clamp(unexploredColor.a, 0.5f, 0.95f);
+    }
+
+    private void RevealInitialBaseArea()
+    {
+        if (revealedCells.Count > 0)
+            return;
+
+        WorldBaseMarker marker = WorldBaseMarker.FindPrimary(true);
+        HexCell baseHex = marker != null ? grid.GetClosestHex(marker.transform.position) : null;
+        if (baseHex == null && grid.allHexCells.Count > 0)
+            baseHex = grid.allHexCells[grid.allHexCells.Count / 2];
+
+        if (baseHex == null)
+            return;
+
+        foreach (HexCell cell in grid.allHexCells)
+        {
+            if (cell != null && baseHex.GetDistance(cell) <= initialRevealRadius)
+                revealedCells.Add(cell);
+        }
+    }
+
+    private void CreateFogHex(HexCell cell)
+    {
+        MeshFilter sourceMesh = cell.GetComponentInChildren<MeshFilter>();
+        if (sourceMesh == null || sourceMesh.sharedMesh == null)
+            return;
+
+        GameObject fog = new GameObject(
+            "FogTile_" + cell.axialCoord.x + "_" + cell.axialCoord.y,
+            typeof(MeshFilter),
+            typeof(MeshRenderer)
+        );
+
+        fog.transform.SetParent(cloudRoot, false);
+        fog.transform.position = cell.transform.position + Vector3.up * yOffset;
+        fog.transform.rotation = Quaternion.identity;
+        fog.GetComponent<MeshFilter>().sharedMesh = CreateSquareTileMesh(GetTileSize());
+
+        MeshRenderer renderer = fog.GetComponent<MeshRenderer>();
+        renderer.sharedMaterial = IsFrontier(cell) ? frontierMaterial : unexploredMaterial;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+
+        fogByCell[cell] = fog;
+    }
+
+    private Vector2 GetTileSize()
+    {
+        float safeSize = grid != null ? Mathf.Max(0.1f, grid.size) : 1f;
+        float width = Mathf.Sqrt(3f) * safeSize * tileFillRatio;
+        float height = 1.5f * safeSize * tileFillRatio;
+        return new Vector2(width, height);
+    }
+
+    private Mesh CreateSquareTileMesh(Vector2 tileSize)
+    {
+        Mesh mesh = new Mesh();
+        float halfX = tileSize.x * 0.5f;
+        float halfZ = tileSize.y * 0.5f;
+
+        mesh.vertices = new[]
+        {
+            new Vector3(-halfX, 0f, -halfZ),
+            new Vector3(-halfX, 0f, halfZ),
+            new Vector3(halfX, 0f, halfZ),
+            new Vector3(halfX, 0f, -halfZ)
+        };
+        mesh.triangles = new[] { 0, 1, 2, 0, 2, 3 };
+        mesh.uv = new[]
+        {
+            new Vector2(0f, 0f),
+            new Vector2(0f, 1f),
+            new Vector2(1f, 1f),
+            new Vector2(1f, 0f)
+        };
+        mesh.RecalculateNormals();
+        return mesh;
+    }
+
+    private bool IsFrontier(HexCell cell)
+    {
+        if (frontierFadeRadius <= 0 || cell == null)
+            return false;
+
+        foreach (HexCell revealed in revealedCells)
+        {
+            if (revealed != null && revealed.GetDistance(cell) <= frontierFadeRadius)
+                return true;
+        }
+
+        return false;
+    }
+
+    private void RefreshFrontierMaterials()
+    {
+        foreach (KeyValuePair<HexCell, GameObject> pair in fogByCell)
+        {
+            if (pair.Value == null || pair.Key == null)
+                continue;
+
+            MeshRenderer renderer = pair.Value.GetComponent<MeshRenderer>();
+            if (renderer != null)
+                renderer.sharedMaterial = IsFrontier(pair.Key) ? frontierMaterial : unexploredMaterial;
+        }
+    }
+
+    private void RemoveFog(HexCell cell)
+    {
+        if (cell == null || !fogByCell.TryGetValue(cell, out GameObject fog))
+            return;
+
+        fogByCell.Remove(cell);
+        if (fog == null)
+            return;
+
+        if (Application.isPlaying)
+            Destroy(fog);
+        else
+            DestroyImmediate(fog);
     }
 
     private void EnsureRoot()
@@ -79,230 +278,104 @@ public class WorldMapCloudMask : MonoBehaviour
         if (cloudRoot != null)
             return;
 
-        Transform existing = transform.Find("WorldMapCloudMask_Runtime");
+        Transform existing = transform.Find("WorldMapHexFog_Runtime");
         if (existing != null)
         {
             cloudRoot = existing;
             return;
         }
 
-        GameObject root = new GameObject("WorldMapCloudMask_Runtime");
+        GameObject root = new GameObject("WorldMapHexFog_Runtime");
         root.transform.SetParent(transform, false);
         cloudRoot = root.transform;
     }
 
     private void ClearRoot()
     {
+        fogByCell.Clear();
+
         if (cloudRoot == null)
             return;
 
         for (int i = cloudRoot.childCount - 1; i >= 0; i--)
-            Destroy(cloudRoot.GetChild(i).gameObject);
-    }
-
-    private Bounds GetGridBounds()
-    {
-        if (grid.allHexCells != null && grid.allHexCells.Count > 0)
         {
-            bool hasCells = false;
-            Bounds cellBounds = new Bounds(grid.transform.position, Vector3.one);
-            for (int i = 0; i < grid.allHexCells.Count; i++)
-            {
-                HexCell cell = grid.allHexCells[i];
-                if (cell == null)
-                    continue;
-
-                if (!hasCells)
-                {
-                    cellBounds = new Bounds(cell.transform.position, Vector3.one * Mathf.Max(1f, grid.size));
-                    hasCells = true;
-                }
-                else
-                {
-                    cellBounds.Encapsulate(cell.transform.position);
-                }
-            }
-
-            if (hasCells)
-            {
-                float expand = Mathf.Max(1.5f, grid.size * 1.5f);
-                cellBounds.Expand(new Vector3(expand, 0f, expand));
-                return cellBounds;
-            }
-        }
-
-        Renderer[] renderers = grid.GetComponentsInChildren<Renderer>(false);
-        if (renderers == null || renderers.Length == 0)
-            return new Bounds(grid.transform.position, new Vector3(90f, 1f, 90f));
-
-        bool hasBounds = false;
-        Bounds bounds = new Bounds(grid.transform.position, new Vector3(90f, 1f, 90f));
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            if (renderers[i] == null ||
-                renderers[i].GetComponentInParent<WorldMapCloudMask>() != null)
-            {
-                continue;
-            }
-
-            if (!hasBounds)
-            {
-                bounds = renderers[i].bounds;
-                hasBounds = true;
-                continue;
-            }
-
-            bounds.Encapsulate(renderers[i].bounds);
-        }
-
-        return bounds;
-    }
-
-    private void CreateCloudBand(string objectName, Bounds bounds, Vector3 outward)
-    {
-        bool horizontal = Mathf.Abs(outward.z) > 0.5f;
-        Vector3 center = bounds.center;
-        center.y += yOffset - 0.03f;
-
-        float length = horizontal ? bounds.size.x + cloudBandWidth * 2f : bounds.size.z + cloudBandWidth * 2f;
-        float width = Mathf.Max(24f, cloudBandWidth);
-
-        if (horizontal)
-            center.z += Mathf.Sign(outward.z) * (bounds.extents.z + edgePadding + width * 0.5f);
-        else
-            center.x += Mathf.Sign(outward.x) * (bounds.extents.x + edgePadding + width * 0.5f);
-
-        GameObject band = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        band.name = objectName;
-        band.transform.SetParent(cloudRoot, true);
-        band.transform.position = center;
-        band.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-        band.transform.localScale = horizontal
-            ? new Vector3(length, width, 1f)
-            : new Vector3(width, length, 1f);
-
-        Collider col = band.GetComponent<Collider>();
-        if (col != null)
-            Destroy(col);
-
-        Renderer renderer = band.GetComponent<Renderer>();
-        if (renderer == null)
-            return;
-
-        renderer.sharedMaterial = CreateCloudMaterial(new Color(
-            cloudColor.r,
-            cloudColor.g,
-            cloudColor.b,
-            Mathf.Clamp01(cloudColor.a * 0.55f)));
-        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        renderer.receiveShadows = false;
-    }
-
-    private void CreateCloudCorner(string objectName, Bounds bounds, float xSign, float zSign)
-    {
-        Vector3 center = bounds.center;
-        center.y += yOffset - 0.04f;
-        center.x += xSign * (bounds.extents.x + edgePadding + cloudBandWidth * 0.5f);
-        center.z += zSign * (bounds.extents.z + edgePadding + cloudBandWidth * 0.5f);
-
-        GameObject corner = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        corner.name = objectName;
-        corner.transform.SetParent(cloudRoot, true);
-        corner.transform.position = center;
-        corner.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-        corner.transform.localScale = new Vector3(cloudBandWidth * 1.35f, cloudBandWidth * 1.35f, 1f);
-
-        Collider col = corner.GetComponent<Collider>();
-        if (col != null)
-            Destroy(col);
-
-        Renderer renderer = corner.GetComponent<Renderer>();
-        if (renderer == null)
-            return;
-
-        renderer.sharedMaterial = CreateCloudMaterial(cloudColor);
-        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        renderer.receiveShadows = false;
-    }
-
-    private void CreateCloudSide(string sideName, Bounds bounds, Vector3 outward)
-    {
-        bool horizontal = Mathf.Abs(outward.z) > 0.5f;
-        float length = horizontal ? bounds.size.x : bounds.size.z;
-        Vector3 center = bounds.center;
-        center.y += yOffset;
-
-        if (horizontal)
-            center.z += Mathf.Sign(outward.z) * (bounds.extents.z + edgePadding);
-        else
-            center.x += Mathf.Sign(outward.x) * (bounds.extents.x + edgePadding);
-
-        for (int i = 0; i < cloudPuffsPerSide; i++)
-        {
-            float t = cloudPuffsPerSide <= 1 ? 0.5f : i / (float)(cloudPuffsPerSide - 1);
-            float along = Mathf.Lerp(-length * 0.55f, length * 0.55f, t);
-            float jitter = Mathf.PerlinNoise(i * 0.37f, sideName.Length * 0.71f);
-            float outwardOffset = Mathf.Lerp(cloudBandWidth * 0.45f, cloudBandWidth * 1.2f, jitter);
-
-            Vector3 pos = center;
-            if (horizontal)
-            {
-                pos.x += along;
-                pos.z += Mathf.Sign(outward.z) * outwardOffset;
-            }
+            GameObject child = cloudRoot.GetChild(i).gameObject;
+            if (Application.isPlaying)
+                Destroy(child);
             else
-            {
-                pos.z += along;
-                pos.x += Mathf.Sign(outward.x) * outwardOffset;
-            }
-
-            float scale = Mathf.Lerp(puffScaleRange.x, puffScaleRange.y, Mathf.PerlinNoise(i * 0.23f, 9.1f));
-            CreateCloudPuff(sideName + "_" + i, pos, scale);
+                DestroyImmediate(child);
         }
     }
 
-    private void CreateCloudPuff(string objectName, Vector3 position, float scale)
+    private void EnsureMaterials()
     {
-        GameObject puff = GameObject.CreatePrimitive(PrimitiveType.Quad);
-        puff.name = objectName;
-        puff.transform.SetParent(cloudRoot, true);
-        puff.transform.position = position;
-        puff.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-        puff.transform.localScale = new Vector3(scale * 1.55f, scale, 1f);
+        if (unexploredMaterial == null)
+            unexploredMaterial = CreateCloudMaterial(unexploredColor, "HexFog_Unexplored");
 
-        Collider col = puff.GetComponent<Collider>();
-        if (col != null)
-            Destroy(col);
-
-        Renderer renderer = puff.GetComponent<Renderer>();
-        if (renderer == null)
-            return;
-
-        renderer.sharedMaterial = CreateCloudMaterial(cloudColor);
-        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        renderer.receiveShadows = false;
+        if (frontierMaterial == null)
+            frontierMaterial = CreateCloudMaterial(frontierColor, "HexFog_Frontier");
     }
 
-    private Material CreateCloudMaterial(Color color)
+    private void HookModeEvents()
+    {
+        if (GameModeManager.Instance == null)
+            return;
+
+        GameModeManager.Instance.ModeChanged -= OnModeChanged;
+        GameModeManager.Instance.ModeChanged += OnModeChanged;
+        ApplyModeVisibility();
+    }
+
+    private void OnModeChanged(GameViewMode mode)
+    {
+        ApplyModeVisibility();
+    }
+
+    private void ApplyModeVisibility()
+    {
+        if (cloudRoot == null)
+            return;
+
+        bool visible = true;
+        if (hideInBaseView &&
+            GameModeManager.Instance != null &&
+            GameModeManager.Instance.CurrentMode == GameViewMode.BaseView)
+        {
+            visible = false;
+        }
+
+        cloudRoot.gameObject.SetActive(visible);
+    }
+
+    private Material CreateCloudMaterial(Color color, string materialName)
     {
         Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
         if (shader == null)
             shader = Shader.Find("Unlit/Color");
+        if (shader == null)
+            shader = Shader.Find("Standard");
 
         Material mat = new Material(shader);
-        mat.color = cloudColor;
+        mat.name = materialName;
         mat.color = color;
 
+        if (mat.HasProperty("_BaseColor"))
+            mat.SetColor("_BaseColor", color);
+        if (mat.HasProperty("_Color"))
+            mat.SetColor("_Color", color);
         if (mat.HasProperty("_Surface"))
             mat.SetFloat("_Surface", 1f);
-
         if (mat.HasProperty("_Blend"))
             mat.SetFloat("_Blend", 0f);
+        if (mat.HasProperty("_ZWrite"))
+            mat.SetFloat("_ZWrite", 0f);
+        if (mat.HasProperty("_SrcBlend"))
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        if (mat.HasProperty("_DstBlend"))
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
 
-        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-        mat.SetInt("_ZWrite", 0);
         mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        mat.DisableKeyword("_ALPHATEST_ON");
         mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
         return mat;
     }

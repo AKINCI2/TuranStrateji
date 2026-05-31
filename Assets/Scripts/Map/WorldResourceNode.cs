@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 [RequireComponent(typeof(Collider))]
 public class WorldResourceNode : MonoBehaviour
@@ -24,6 +24,9 @@ public class WorldResourceNode : MonoBehaviour
     public int guardDamage = 8;
     public ResourceCost firstClearReward;
 
+    [Header("Visual")]
+    public GameObject customModelPrefab;
+    private GameObject customModelInstance;
     private Renderer[] renderers;
     private GameObject guardRoot;
     private GameObject collectorRoot;
@@ -32,6 +35,18 @@ public class WorldResourceNode : MonoBehaviour
 
     void Awake()
     {
+        InitializeVisuals();
+    }
+
+    private void InitializeVisuals()
+    {
+        if (customModelPrefab != null && customModelInstance == null)
+        {
+            customModelInstance = Instantiate(customModelPrefab, transform);
+            customModelInstance.transform.localPosition = Vector3.zero;
+            customModelInstance.transform.localRotation = Quaternion.identity;
+        }
+
         renderers = GetComponentsInChildren<Renderer>(true);
     }
 
@@ -116,6 +131,47 @@ public class WorldResourceNode : MonoBehaviour
         guardDamage = enabled ? Mathf.Max(0, damage) : 0;
         firstClearReward = firstReward;
         RefreshGuardVisual();
+    }
+
+    public void ApplySavedState(
+        WorldResourceType savedResourceType,
+        int savedLevel,
+        int savedAmount,
+        int savedRemainingAmount,
+        bool savedIsCollected,
+        bool savedRequiresTimedGathering,
+        float savedGatherDurationSeconds,
+        int savedGatherPowerPerSecond,
+        bool savedHasGuard,
+        int savedGuardMaxHealth,
+        int savedGuardHealth,
+        int savedGuardDamage,
+        ResourceCost savedFirstClearReward,
+        bool savedFirstClearRewardGranted)
+    {
+        resourceType = savedResourceType;
+        level = Mathf.Max(1, savedLevel);
+        amount = Mathf.Max(1, savedAmount);
+        remainingAmount = Mathf.Clamp(savedRemainingAmount, 0, amount);
+        isCollected = savedIsCollected || remainingAmount <= 0;
+
+        requiresTimedGathering = savedRequiresTimedGathering;
+        gatherDurationSeconds = Mathf.Max(1f, savedGatherDurationSeconds);
+        gatherPowerPerSecond = Mathf.Max(1, savedGatherPowerPerSecond);
+        isGathering = false;
+        activeGatherer = null;
+        gatherTimer = 0f;
+
+        hasGuard = savedHasGuard;
+        guardMaxHealth = Mathf.Max(0, savedGuardMaxHealth);
+        guardHealth = Mathf.Clamp(savedGuardHealth, 0, guardMaxHealth);
+        guardDamage = Mathf.Max(0, savedGuardDamage);
+        firstClearReward = savedFirstClearReward;
+        firstClearRewardGranted = savedFirstClearRewardGranted;
+
+        RefreshGuardVisual();
+        RefreshCollectorVisual(false);
+        SetVisualActive(!isCollected);
     }
 
     public void SetGuardRoot(GameObject root)

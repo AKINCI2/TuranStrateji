@@ -130,6 +130,8 @@ public class BaseViewEnvironment : MonoBehaviour
             foundationAccentColor
         );
 
+        CreateBaseRoadNetwork(parent, size);
+
         float wallOffset = half - wallThickness * 0.5f;
         float wallSpan = Mathf.Max(0.1f, size - wallThickness * 2f);
         CreateBox(parent, "BaseWall_North", new Vector3(wallSpan, wallHeight, wallThickness), new Vector3(0f, wallHeight * 0.5f, wallOffset), wallColor, foundationAccentColor);
@@ -142,6 +144,20 @@ public class BaseViewEnvironment : MonoBehaviour
         CreateOctagonalTower(parent, "WatchTower_NW", new Vector3(-towerOffset, towerHeight * 0.5f, towerOffset), towerRadius, towerHeight);
         CreateOctagonalTower(parent, "WatchTower_SE", new Vector3(towerOffset, towerHeight * 0.5f, -towerOffset), towerRadius, towerHeight);
         CreateOctagonalTower(parent, "WatchTower_SW", new Vector3(-towerOffset, towerHeight * 0.5f, -towerOffset), towerRadius, towerHeight);
+    }
+
+    private void CreateBaseRoadNetwork(Transform parent, float size)
+    {
+        float roadWidth = Mathf.Clamp(size * 0.055f, 0.12f, 0.42f);
+        Color roadHighlight = Color.Lerp(roadColor, foundationAccentColor, 0.35f);
+        Color plazaColor = Color.Lerp(foundationColor, roadColor, 0.45f);
+        Color plazaAccent = Color.Lerp(foundationAccentColor, wallColor, 0.35f);
+
+        CreateQuad(parent, "BaseRoad_Main_NorthSouth", new Vector2(roadWidth, size * 0.72f), Vector3.zero, -0.052f, roadColor, roadHighlight);
+        CreateQuad(parent, "BaseRoad_Main_EastWest", new Vector2(size * 0.72f, roadWidth), Vector3.zero, -0.051f, roadColor, roadHighlight);
+        CreateQuad(parent, "BaseRoad_Service_South", new Vector2(size * 0.58f, roadWidth * 0.72f), new Vector3(0f, 0f, -size * 0.24f), -0.050f, roadColor, roadHighlight);
+        CreateQuad(parent, "BaseRoad_Service_North", new Vector2(size * 0.52f, roadWidth * 0.72f), new Vector3(0f, 0f, size * 0.24f), -0.050f, roadColor, roadHighlight);
+        CreateQuad(parent, "BaseCommand_Plaza", new Vector2(size * 0.23f, size * 0.18f), new Vector3(0f, 0f, size * 0.10f), -0.049f, plazaColor, plazaAccent);
     }
 
     private float GetCurrentFoundationSize()

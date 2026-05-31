@@ -9,11 +9,12 @@ public class GameSaveManager : MonoBehaviour
 {
     public static GameSaveManager Instance { get; private set; }
 
-    [Header("Save")]
+    [Header("Local Debug Save")]
+    public bool editorOnly = true;
     public string saveFileName = "turan_save.json";
-    public bool loadOnStart = true;
-    public bool saveOnQuit = true;
-    public float autosaveInterval = 30f;
+    public bool loadOnStart = false;
+    public bool saveOnQuit = false;
+    public float autosaveInterval = 0f;
 
     private float nextAutosaveTime;
     private bool loadAttempted;
@@ -22,6 +23,12 @@ public class GameSaveManager : MonoBehaviour
 
     void Awake()
     {
+        if (editorOnly && !Application.isEditor)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -178,6 +185,10 @@ public class GameSaveManager : MonoBehaviour
             });
         }
 
+        CaptureWorldResourceNodes(data);
+        CaptureWorldCities(data);
+        CaptureWorldUnits(data);
+
         return data;
     }
 
@@ -206,6 +217,9 @@ public class GameSaveManager : MonoBehaviour
         ApplyProduction(data);
         ApplyBuildings(data);
         ApplyBarracks(data);
+        ApplyWorldResourceNodes(data);
+        ApplyWorldCities(data);
+        ApplyWorldUnits(data);
     }
 
     private void ApplyProduction(GameSaveData data)
@@ -283,6 +297,277 @@ public class GameSaveManager : MonoBehaviour
         }
     }
 
+    private void CaptureWorldResourceNodes(GameSaveData data)
+    {
+        WorldResourceNodeManager manager =
+            WorldResourceNodeManager.Instance != null
+                ? WorldResourceNodeManager.Instance
+                : FindAnyObjectByType<WorldResourceNodeManager>();
+
+        if (manager == null)
+            return;
+
+        foreach (WorldResourceNode node in manager.GetAllNodesSnapshot())
+        {
+            if (node == null || node.hex == null)
+                continue;
+
+            data.worldResourceNodes.Add(new WorldResourceNodeSave
+            {
+                resourceType = node.resourceType,
+                level = node.level,
+                amount = node.amount,
+                remainingAmount = node.remainingAmount,
+                q = node.hex.axialCoord.x,
+                r = node.hex.axialCoord.y,
+                isCollected = node.isCollected,
+                requiresTimedGathering = node.requiresTimedGathering,
+                gatherDurationSeconds = node.gatherDurationSeconds,
+                gatherPowerPerSecond = node.gatherPowerPerSecond,
+                hasGuard = node.hasGuard,
+                guardMaxHealth = node.guardMaxHealth,
+                guardHealth = node.guardHealth,
+                guardDamage = node.guardDamage,
+                firstClearReward = node.firstClearReward,
+                firstClearRewardGranted = node.firstClearRewardGranted
+            });
+        }
+    }
+
+    private void ApplyWorldResourceNodes(GameSaveData data)
+    {
+        if (data.worldResourceNodes == null || data.worldResourceNodes.Count == 0)
+            return;
+
+        WorldResourceNodeManager manager =
+            WorldResourceNodeManager.Instance != null
+                ? WorldResourceNodeManager.Instance
+                : FindAnyObjectByType<WorldResourceNodeManager>();
+
+        HexGridManager grid = FindAnyObjectByType<HexGridManager>();
+        if (manager == null || grid == null)
+            return;
+
+        manager.EnsureGenerated();
+
+        foreach (WorldResourceNodeSave save in data.worldResourceNodes)
+        {
+            if (save == null)
+                continue;
+
+            HexCell hex = grid.GetHexAt(save.q, save.r);
+            if (hex == null)
+                continue;
+
+            WorldResourceNode node =
+                manager.GetNodeAtHex(hex) ??
+                manager.GetOrCreateSavedNode(
+                    save.resourceType,
+                    save.level,
+                    save.amount,
+                    hex
+                );
+
+            if (node == null)
+                continue;
+
+            node.ApplySavedState(
+                save.resourceType,
+                save.level,
+                save.amount,
+                save.remainingAmount,
+                save.isCollected,
+                save.requiresTimedGathering,
+                save.gatherDurationSeconds,
+                save.gatherPowerPerSecond,
+                save.hasGuard,
+                save.guardMaxHealth,
+                save.guardHealth,
+                save.guardDamage,
+                save.firstClearReward,
+                save.firstClearRewardGranted
+            );
+        }
+    }
+
+    private void CaptureWorldCities(GameSaveData data)
+    {
+        HexGridManager grid = FindAnyObjectByType<HexGridManager>();
+        WorldCityNode[] cities = FindObjectsByType<WorldCityNode>(FindObjectsInactive.Include);
+
+        foreach (WorldCityNode city in cities)
+        {
+            if (city == null)
+                continue;
+
+            HexCell hex = IsGridReady(grid)
+                ? grid.GetClosestHex(city.transform.position)
+                : null;
+
+            data.worldCities.Add(new WorldCitySave
+            {
+                cityId = city.cityId,
+                q = hex != null ? hex.axialCoord.x : 0,
+                r = hex != null ? hex.axialCoord.y : 0,
+                hasHex = hex != null,
+                controllingAllianceId = city.controllingAllianceId,
+                controllingColor = new SerializableColor(city.controllingColor),
+                occupationState = city.occupationState,
+                occupyingAllianceId = city.occupyingAllianceId,
+                occupyingColor = new SerializableColor(city.occupyingColor),
+                stationedMemberCount = city.stationedMemberCount,
+                occupationProgress = city.occupationProgress
+            });
+        }
+    }
+
+    private void ApplyWorldCities(GameSaveData data)
+    {
+        if (data.worldCities == null || data.worldCities.Count == 0)
+            return;
+
+        WorldCityNode[] cities = FindObjectsByType<WorldCityNode>(FindObjectsInactive.Include);
+
+        foreach (WorldCitySave save in data.worldCities)
+        {
+            if (save == null)
+                continue;
+
+            WorldCityNode city = FindCity(cities, save);
+            if (city == null)
+                continue;
+
+            city.controllingAllianceId = save.controllingAllianceId ?? string.Empty;
+            city.controllingColor = save.controllingColor.ToColor();
+            city.occupationState = save.occupationState;
+            city.occupyingAllianceId = save.occupyingAllianceId ?? string.Empty;
+            city.occupyingColor = save.occupyingColor.ToColor();
+            city.stationedMemberCount = Mathf.Max(0, save.stationedMemberCount);
+
+            float maxProgress = Mathf.Max(0f, city.baseOccupationSeconds);
+            city.occupationProgress = maxProgress > 0f
+                ? Mathf.Clamp(save.occupationProgress, 0f, maxProgress)
+                : Mathf.Max(0f, save.occupationProgress);
+
+            city.RebuildInfluence();
+            city.ApplyTerritoryVisuals();
+        }
+    }
+
+    private void CaptureWorldUnits(GameSaveData data)
+    {
+        UnitManager unitManager =
+            UnitManager.Instance != null
+                ? UnitManager.Instance
+                : FindAnyObjectByType<UnitManager>();
+
+        List<UnitController> units =
+            unitManager != null && unitManager.units != null
+                ? unitManager.units
+                : new List<UnitController>(FindObjectsByType<UnitController>(FindObjectsInactive.Include));
+
+        HexGridManager grid = FindAnyObjectByType<HexGridManager>();
+
+        foreach (UnitController unit in units)
+        {
+            if (unit == null ||
+                unit.state == UnitState.Death ||
+                unit.deploymentState != UnitDeploymentState.OnWorldMap)
+            {
+                continue;
+            }
+
+            HexCell hex = unit.currentHex;
+            if (hex == null && IsGridReady(grid))
+                hex = grid.GetClosestHex(unit.transform.position);
+
+            Health health = unit.GetComponent<Health>();
+
+            data.worldUnits.Add(new WorldUnitSave
+            {
+                key = GetUnitKey(unit),
+                unitName = unit.name,
+                unitId = unit.unitData != null ? unit.unitData.unitId : string.Empty,
+                assignedBarracksKey = GetBarracksKey(unit.assignedBarracks),
+                isEnemy = unit.CompareTag("Enemy"),
+                q = hex != null ? hex.axialCoord.x : 0,
+                r = hex != null ? hex.axialCoord.y : 0,
+                hasHex = hex != null,
+                x = unit.transform.position.x,
+                y = unit.transform.position.y,
+                z = unit.transform.position.z,
+                currentHealth = health != null ? health.currentHealth : -1
+            });
+        }
+    }
+
+    private void ApplyWorldUnits(GameSaveData data)
+    {
+        if (data.worldUnits == null || data.worldUnits.Count == 0)
+            return;
+
+        HexGridManager grid = FindAnyObjectByType<HexGridManager>();
+        BarracksBuilding[] barracksBuildings = FindObjectsByType<BarracksBuilding>(FindObjectsInactive.Include);
+        UnitController[] sceneUnits = FindObjectsByType<UnitController>(FindObjectsInactive.Include);
+
+        foreach (WorldUnitSave save in data.worldUnits)
+        {
+            if (save == null)
+                continue;
+
+            UnitController unit = FindUnit(sceneUnits, save);
+
+            if (unit == null && !save.isEnemy)
+            {
+                BarracksBuilding barracks = FindBarracks(barracksBuildings, save.assignedBarracksKey);
+                if (barracks != null)
+                    unit = barracks.EnsureRepresentativeUnit();
+            }
+
+            if (unit == null)
+                continue;
+
+            BarracksBuilding assignedBarracks = FindBarracks(barracksBuildings, save.assignedBarracksKey);
+            if (assignedBarracks != null)
+                unit.assignedBarracks = assignedBarracks;
+
+            Vector3 position = new Vector3(save.x, save.y, save.z);
+            if (save.hasHex && grid != null)
+            {
+                HexCell hex = grid.GetHexAt(save.q, save.r);
+                if (hex != null)
+                {
+                    position = grid.GetHexCenter(hex);
+                    position.y = save.y > 0f ? save.y : 0.5f;
+                }
+            }
+
+            Transform worldParent =
+                GameModeManager.Instance != null && GameModeManager.Instance.worldUnitsRoot != null
+                    ? GameModeManager.Instance.worldUnitsRoot.transform
+                    : null;
+
+            if (worldParent != null)
+                unit.transform.SetParent(worldParent);
+
+            unit.PlaceOnWorld(position);
+            unit.state = UnitState.Idle;
+
+            if (assignedBarracks != null)
+                assignedBarracks.MarkUnitOnMap(unit);
+
+            Health health = unit.GetComponent<Health>();
+            if (health != null && save.currentHealth >= 0)
+                health.SetCurrentHealth(Mathf.Max(1, save.currentHealth));
+
+            if (UnitManager.Instance != null)
+            {
+                UnitManager.Instance.RegisterUnit(unit);
+                UnitManager.Instance.RefreshUnitVisibility(unit);
+            }
+        }
+    }
+
     private string GetBuildingKey(BaseBuilding building)
     {
         BuildingSlot slot = building.GetComponentInParent<BuildingSlot>();
@@ -290,6 +575,37 @@ public class GameSaveManager : MonoBehaviour
             return slot.slotId;
 
         return building.name;
+    }
+
+    private string GetBarracksKey(BarracksBuilding barracks)
+    {
+        if (barracks == null)
+            return string.Empty;
+
+        BaseBuilding building = barracks.GetComponent<BaseBuilding>();
+        return building != null ? GetBuildingKey(building) : barracks.name;
+    }
+
+    private string GetUnitKey(UnitController unit)
+    {
+        if (unit == null)
+            return string.Empty;
+
+        string unitId = unit.unitData != null ? unit.unitData.unitId : string.Empty;
+        string barracksKey = GetBarracksKey(unit.assignedBarracks);
+
+        if (!string.IsNullOrWhiteSpace(barracksKey))
+            return "barracks:" + barracksKey + ":" + unitId;
+
+        string prefix = unit.CompareTag("Enemy") ? "enemy:" : "unit:";
+        return prefix + unit.name;
+    }
+
+    private bool IsGridReady(HexGridManager grid)
+    {
+        return grid != null &&
+               grid.allHexCells != null &&
+               grid.allHexCells.Count > 0;
     }
 
     private BaseBuilding FindBuilding(BaseBuilding[] buildings, string key, BuildingType type)
@@ -316,6 +632,83 @@ public class GameSaveManager : MonoBehaviour
             BaseBuilding building = barracks.GetComponent<BaseBuilding>();
             if (building != null && GetBuildingKey(building) == key)
                 return barracks;
+        }
+
+        return null;
+    }
+
+    private WorldCityNode FindCity(WorldCityNode[] cities, WorldCitySave save)
+    {
+        foreach (WorldCityNode city in cities)
+        {
+            if (city == null)
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(save.cityId) &&
+                city.cityId == save.cityId)
+            {
+                return city;
+            }
+        }
+
+        if (!save.hasHex)
+            return null;
+
+        HexGridManager grid = FindAnyObjectByType<HexGridManager>();
+        if (!IsGridReady(grid))
+            return null;
+
+        foreach (WorldCityNode city in cities)
+        {
+            if (city == null)
+                continue;
+
+            HexCell hex = grid.GetClosestHex(city.transform.position);
+            if (hex != null &&
+                hex.axialCoord.x == save.q &&
+                hex.axialCoord.y == save.r)
+            {
+                return city;
+            }
+        }
+
+        return null;
+    }
+
+    private UnitController FindUnit(UnitController[] units, WorldUnitSave save)
+    {
+        foreach (UnitController unit in units)
+        {
+            if (unit == null)
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(save.key) &&
+                GetUnitKey(unit) == save.key)
+            {
+                return unit;
+            }
+        }
+
+        foreach (UnitController unit in units)
+        {
+            if (unit == null)
+                continue;
+
+            if (save.isEnemy)
+            {
+                if (unit.CompareTag("Enemy") && unit.name == save.unitName)
+                    return unit;
+
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(save.assignedBarracksKey) &&
+                GetBarracksKey(unit.assignedBarracks) == save.assignedBarracksKey)
+            {
+                string unitId = unit.unitData != null ? unit.unitData.unitId : string.Empty;
+                if (string.IsNullOrWhiteSpace(save.unitId) || unitId == save.unitId)
+                    return unit;
+            }
         }
 
         return null;
@@ -353,13 +746,16 @@ public class GameSaveManager : MonoBehaviour
 [Serializable]
 public class GameSaveData
 {
-    public int version = 1;
+    public int version = 2;
     public ResourceCost wallet;
     public MaterialInventorySave materials = new MaterialInventorySave();
     public int productionSlotCount;
     public List<ProductionSlotSave> productionSlots = new List<ProductionSlotSave>();
     public List<BuildingSave> buildings = new List<BuildingSave>();
     public List<BarracksSave> barracks = new List<BarracksSave>();
+    public List<WorldResourceNodeSave> worldResourceNodes = new List<WorldResourceNodeSave>();
+    public List<WorldCitySave> worldCities = new List<WorldCitySave>();
+    public List<WorldUnitSave> worldUnits = new List<WorldUnitSave>();
 }
 
 [Serializable]
@@ -405,4 +801,80 @@ public class BarracksSave
     public bool isTraining;
     public float trainingRemainingSeconds;
     public int trainingSoldierCount;
+}
+
+[Serializable]
+public class WorldResourceNodeSave
+{
+    public WorldResourceType resourceType;
+    public int level;
+    public int amount;
+    public int remainingAmount;
+    public int q;
+    public int r;
+    public bool isCollected;
+    public bool requiresTimedGathering;
+    public float gatherDurationSeconds;
+    public int gatherPowerPerSecond;
+    public bool hasGuard;
+    public int guardMaxHealth;
+    public int guardHealth;
+    public int guardDamage;
+    public ResourceCost firstClearReward;
+    public bool firstClearRewardGranted;
+}
+
+[Serializable]
+public class WorldCitySave
+{
+    public string cityId;
+    public int q;
+    public int r;
+    public bool hasHex;
+    public string controllingAllianceId;
+    public SerializableColor controllingColor;
+    public AllianceOccupationState occupationState;
+    public string occupyingAllianceId;
+    public SerializableColor occupyingColor;
+    public int stationedMemberCount;
+    public float occupationProgress;
+}
+
+[Serializable]
+public class WorldUnitSave
+{
+    public string key;
+    public string unitName;
+    public string unitId;
+    public string assignedBarracksKey;
+    public bool isEnemy;
+    public int q;
+    public int r;
+    public bool hasHex;
+    public float x;
+    public float y;
+    public float z;
+    public int currentHealth;
+}
+
+[Serializable]
+public struct SerializableColor
+{
+    public float r;
+    public float g;
+    public float b;
+    public float a;
+
+    public SerializableColor(Color color)
+    {
+        r = color.r;
+        g = color.g;
+        b = color.b;
+        a = color.a;
+    }
+
+    public Color ToColor()
+    {
+        return new Color(r, g, b, a);
+    }
 }

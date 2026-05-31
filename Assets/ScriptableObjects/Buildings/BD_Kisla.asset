@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9898f448f11c51c48b2eb077ce1595b6, type: 3}
+  m_Name: BD_Kisla
+  m_EditorClassIdentifier: Assembly-CSharp::BuildingData
+  buildingId: kisla
+  displayName: Kisla
+  type: 1
+  icon: {fileID: 0}
+  levels:
+  - level: 1
+    visualPrefab: {fileID: 7591290835165187548, guid: ac4c4d93ca3307e4d840e512c446a7d1, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 1
+    powerReward: 45
+    upgradeSeconds: 0
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 0
+      oil: 0
+      bor: 0
+  - level: 2
+    visualPrefab: {fileID: 7591290835165187548, guid: ac4c4d93ca3307e4d840e512c446a7d1, type: 3}
+    visualScale: {x: 1, y: 1, z: 1}
+    visualRotation: {x: 0, y: 0, z: 0}
+    requiredHeadquartersLevel: 2
+    powerReward: 95
+    upgradeSeconds: 75
+    upgradeCost:
+      gold: 0
+      turanCoin: 0
+      steel: 150
+      oil: 45
+      bor: 4

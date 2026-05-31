@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -11,6 +12,7 @@ public class BarracksBuilding : MonoBehaviour
     [Header("Units")]
     public List<UnitController> assignedUnits = new List<UnitController>();
     public bool showSingleBaseRepresentative = true;
+    public bool showAssignedUnitPreviewInBase = true;
 
     [Header("Army Slot")]
     public TuranUnitData assignedUnitData;
@@ -24,9 +26,13 @@ public class BarracksBuilding : MonoBehaviour
     public Transform baseUnitStagingAnchor;
     public Vector3 baseUnitStagingOffset = new Vector3(0f, 0.08f, 0.08f);
     public float baseUnitCellSpacing = 0.18f;
+    public Vector3 baseUnitExitLocalPosition = new Vector3(0f, 0.08f, -0.45f);
+    public float baseUnitWalkInSeconds = 0.85f;
 
     private BaseBuilding baseBuilding;
     private float trainingEndTime;
+    private readonly Dictionary<UnitController, Coroutine> walkInRoutines =
+        new Dictionary<UnitController, Coroutine>();
 
     public int Capacity
     {
@@ -202,6 +208,12 @@ public class BarracksBuilding : MonoBehaviour
             if (unit != null)
                 unit.SetUnitData(assignedUnitData);
         }
+
+        EnsureRepresentativeUnit(false);
+        UpdateRepresentativeSoldiers();
+
+        if (UnitManager.Instance != null)
+            UnitManager.Instance.RefreshUnitVisibility();
     }
 
     public void SetAssignedOfficer(OfficerData officer)
@@ -267,8 +279,12 @@ public class BarracksBuilding : MonoBehaviour
         {
             trainedSoldiers += 1;
             trainingSoldierCount -= 1;
-            EnsureRepresentativeUnit();
-            UpdateRepresentativeSoldiers();
+            
+            // Teker teker gelmeleri için her asker oluştuğunda temsilciyi bul ve yürüme animasyonunu başlat
+            UnitController rep = EnsureRepresentativeUnit(false);
+            if (rep != null)
+                PlayIndividualSoldierWalkIn(rep, trainedSoldiers - 1);
+
             if (UnitManager.Instance != null)
                 UnitManager.Instance.RefreshUnitVisibility();
         }
@@ -284,7 +300,7 @@ public class BarracksBuilding : MonoBehaviour
         trainingRemainingSeconds = 0f;
         trainingEndTime = 0f;
         trainingSoldierCount = 0;
-        EnsureRepresentativeUnit();
+        EnsureRepresentativeUnit(false);
         UpdateRepresentativeSoldiers();
         if (UnitManager.Instance != null)
             UnitManager.Instance.RefreshUnitVisibility();
@@ -393,7 +409,10 @@ public class BarracksBuilding : MonoBehaviour
 
     public bool ShouldShowUnitInBase(UnitController unit)
     {
-        if (!HasTrainedSoldiers || unit == null || unit.deploymentState != UnitDeploymentState.InBase)
+        if (unit == null || unit.deploymentState != UnitDeploymentState.InBase)
+            return false;
+
+        if (!HasTrainedSoldiers && !showAssignedUnitPreviewInBase)
             return false;
 
         if (!showSingleBaseRepresentative)
@@ -415,11 +434,14 @@ public class BarracksBuilding : MonoBehaviour
         assignedUnits.RemoveAll(unit => unit == null || IsLogisticsUnit(unit.unitData));
     }
 
-    public UnitController EnsureRepresentativeUnit()
+    public UnitController EnsureRepresentativeUnit(bool animateFromBarracksDoor = false)
     {
         CleanupAssignedUnits();
 
-        if (!HasTrainedSoldiers)
+        if (assignedUnitData == null)
+            return null;
+
+        if (!HasTrainedSoldiers && !showAssignedUnitPreviewInBase)
             return null;
 
         UnitController existing = GetFirstUnit(UnitDeploymentState.InBase);
@@ -431,6 +453,8 @@ public class BarracksBuilding : MonoBehaviour
                 : transform;
             existing.PlaceInBase(existingBaseParent, GetBaseUnitLocalPosition());
             existing.RefreshVisualFromData();
+            if (animateFromBarracksDoor)
+                PlayUnitWalkIn(existing);
             UpdateRepresentativeSoldiers();
             return existing;
         }
@@ -439,7 +463,13 @@ public class BarracksBuilding : MonoBehaviour
         if (existing != null)
             return existing;
 
-        GameObject prefab = assignedUnitData != null ? assignedUnitData.worldPrefab : null;
+        GameObject prefab = null;
+        if (assignedUnitData != null)
+        {
+            prefab = assignedUnitData.deployedModelPrefab != null
+                ? assignedUnitData.deployedModelPrefab
+                : assignedUnitData.worldPrefab;
+        }
         GameObject unitObject = null;
 
         if (prefab != null)
@@ -454,7 +484,12 @@ public class BarracksBuilding : MonoBehaviour
         }
 
         if (unitObject == null)
-            return null;
+        {
+            unitObject = new GameObject(assignedUnitData.displayName + "_Birlik");
+            unitObject.AddComponent<UnitController>();
+            unitObject.AddComponent<FormationController>();
+            unitObject.AddComponent<UnitVisualAssembler>();
+        }
 
         unitObject.name = assignedUnitData.displayName + "_Birlik";
         UnitController unit = unitObject.GetComponent<UnitController>();
@@ -472,6 +507,8 @@ public class BarracksBuilding : MonoBehaviour
 
         unit.PlaceInBase(baseParent, GetBaseUnitLocalPosition());
         unit.RefreshVisualFromData();
+        if (animateFromBarracksDoor)
+            PlayUnitWalkIn(unit);
 
         if (!assignedUnits.Contains(unit))
             assignedUnits.Add(unit);
@@ -481,6 +518,67 @@ public class BarracksBuilding : MonoBehaviour
 
         UpdateRepresentativeSoldiers();
         return unit;
+    }
+
+    private void PlayUnitWalkIn(UnitController unit)
+    {
+        if (unit == null)
+            return;
+
+        PlayIndividualSoldierWalkIn(unit, 0);
+    }
+
+    private void PlayIndividualSoldierWalkIn(UnitController unit, int soldierIndex)
+    {
+        if (unit == null || !isActiveAndEnabled)
+            return;
+
+        FormationController formation = unit.GetComponent<FormationController>();
+        if (formation == null)
+            return;
+
+        formation.RebuildSoldiersFromChildren(true);
+        if (soldierIndex < 0 || soldierIndex >= formation.soldiers.Count)
+            return;
+
+        Transform soldier = formation.soldiers[soldierIndex];
+        if (soldier == null)
+            return;
+
+        StartCoroutine(WalkSingleSoldierToPosition(soldier, unit.transform));
+    }
+
+    private IEnumerator WalkSingleSoldierToPosition(Transform soldier, Transform unitRoot)
+    {
+        if (soldier == null || unitRoot == null)
+            yield break;
+
+        soldier.gameObject.SetActive(true);
+        Vector3 finalLocalPos = soldier.localPosition;
+        Vector3 startLocalPos = baseUnitExitLocalPosition;
+        
+        soldier.localPosition = startLocalPos;
+        
+        float duration = baseUnitWalkInSeconds;
+        float elapsed = 0f;
+
+        Animator anim = soldier.GetComponentInChildren<Animator>();
+        if (anim != null) anim.SetFloat("Speed", 1f);
+
+        while (elapsed < duration && soldier != null)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            soldier.localPosition = Vector3.Lerp(startLocalPos, finalLocalPos, t);
+            
+            yield return null;
+        }
+
+        if (soldier != null)
+        {
+            soldier.localPosition = finalLocalPos;
+            if (anim != null) anim.SetFloat("Speed", 0f);
+        }
     }
 
     private void UpdateRepresentativeSoldiers()
@@ -505,12 +603,22 @@ public class BarracksBuilding : MonoBehaviour
 
         formation.RebuildSoldiersFromChildren(true);
 
-        int visible = assignedUnitData != null &&
+        int barracksLevel = baseBuilding != null ? Mathf.Max(1, baseBuilding.currentLevel) : 1;
+        int configuredVisible = assignedUnitData != null
+            ? assignedUnitData.GetVisibleSoldierCountForBarracksLevel(barracksLevel)
+            : formation.maxSoldiers;
+
+        int visible = trainedSoldiers > 0
+            ? Mathf.Min(configuredVisible, trainedSoldiers)
+            : configuredVisible;
+
+        if (assignedUnitData != null &&
             (assignedUnitData.kind == TuranUnitKind.Tank ||
              assignedUnitData.kind == TuranUnitKind.Artillery ||
-             assignedUnitData.kind == TuranUnitKind.RocketArtillery)
-            ? Mathf.Min(1, trainedSoldiers)
-            : trainedSoldiers;
+             assignedUnitData.kind == TuranUnitKind.RocketArtillery))
+        {
+            visible = 1;
+        }
 
         formation.SetVisibleSoldierCount(visible);
     }
@@ -584,6 +692,8 @@ public class BarracksBuilding : MonoBehaviour
     {
         baseUnitStagingOffset = new Vector3(0f, 0.08f, 0.08f);
         baseUnitCellSpacing = 0.17f;
+        baseUnitExitLocalPosition = new Vector3(0f, 0.08f, -0.45f);
+        baseUnitWalkInSeconds = 0.85f;
     }
 
     private bool HasDeployableVisual(UnitController unit)

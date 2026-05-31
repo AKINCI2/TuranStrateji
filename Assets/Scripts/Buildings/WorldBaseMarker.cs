@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class WorldBaseMarker : MonoBehaviour
 {
@@ -165,10 +165,10 @@ public class WorldBaseMarker : MonoBehaviour
         if (!useHeadquartersVisual)
             return;
 
-        worldHexFillRatio = Mathf.Clamp(worldHexFillRatio, 0.9f, 1f);
+        worldHexFillRatio = Mathf.Clamp(worldHexFillRatio, 2.4f, 3.2f);
         targetWorldFootprint = GetLevelBasedWorldFootprint();
         minWorldVisualScale = Mathf.Min(minWorldVisualScale, 0.08f);
-        maxWorldVisualScale = Mathf.Clamp(maxWorldVisualScale, 1f, 8f);
+        maxWorldVisualScale = Mathf.Clamp(maxWorldVisualScale, 3f, 12f);
         autoCorrectWorldVisualUpright = true;
         worldVisualRotation = Vector3.zero;
         transform.rotation = Quaternion.identity;
@@ -521,7 +521,12 @@ public class WorldBaseMarker : MonoBehaviour
 
         Collider col = wall.GetComponent<Collider>();
         if (col != null)
-            col.enabled = false;
+        {
+            if (Application.isPlaying)
+                Destroy(col);
+            else
+                DestroyImmediate(col);
+        }
 
         Renderer renderer = wall.GetComponent<Renderer>();
         if (renderer != null)
@@ -582,7 +587,7 @@ public class WorldBaseMarker : MonoBehaviour
 
     private void EnsureClickCollider()
     {
-        float footprint = Mathf.Max(0.9f, targetWorldFootprint);
+        float footprint = Mathf.Max(1.8f, targetWorldFootprint);
         BoxCollider boxCollider = GetComponent<BoxCollider>();
         if (boxCollider == null)
         {

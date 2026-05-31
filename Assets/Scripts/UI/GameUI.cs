@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using UnityEngine.EventSystems;
 
 public class GameUI : MonoBehaviour
 {
@@ -22,6 +23,7 @@ public class GameUI : MonoBehaviour
         worldBaseSelector = FindAnyObjectByType<WorldBaseSelector>();
         gameMode = FindAnyObjectByType<GameModeManager>();
         cam = Camera.main;
+        EnsureEventSystem();
 
         if (worldBaseSelector == null)
         {
@@ -31,6 +33,9 @@ public class GameUI : MonoBehaviour
 
         if (GetComponent<BuildingPanelUI>() == null)
             gameObject.AddComponent<BuildingPanelUI>();
+
+        if (FindAnyObjectByType<BuildingSlotSelector>() == null)
+            new GameObject("BuildingSlotSelector").AddComponent<BuildingSlotSelector>();
 
         if (GetComponent<ResourceTopBarUI>() == null)
             gameObject.AddComponent<ResourceTopBarUI>();
@@ -62,9 +67,6 @@ public class GameUI : MonoBehaviour
         if (FindAnyObjectByType<ProductionFacilityManager>() == null)
             new GameObject("ProductionFacilityManager").AddComponent<ProductionFacilityManager>();
 
-        if (FindAnyObjectByType<GameSaveManager>() == null)
-            new GameObject("GameSaveManager").AddComponent<GameSaveManager>();
-
         if (FindAnyObjectByType<WorldResourceNodeManager>() == null)
         {
             GameObject nodeManagerObject = new GameObject("WorldResourceNodeManager");
@@ -80,7 +82,7 @@ public class GameUI : MonoBehaviour
             Button button = moveButton.GetComponent<Button>();
             if (button != null)
             {
-                button.onClick.RemoveListener(OnMoveButtonPressed);
+                button.onClick = new Button.ButtonClickedEvent();
                 button.onClick.AddListener(OnMoveButtonPressed);
             }
             ConfigureButtonVisual(moveButton, "Git", new Vector2(0.5f, 0f), new Vector2(0f, 132f), new Vector2(86f, 28f));
@@ -248,8 +250,21 @@ public class GameUI : MonoBehaviour
 
     public void OnEnterBasePressed()
     {
-        if (worldBaseSelector != null) worldBaseSelector.ClearSelection();
-        if (gameMode != null) gameMode.RequestEnterBaseView(true);
+        if (gameMode == null)
+            gameMode = FindAnyObjectByType<GameModeManager>();
+
+        WorldBaseMarker marker = WorldBaseMarker.FindPrimary(true);
+        if (worldBaseSelector != null && marker != null)
+            worldBaseSelector.SelectMarker(marker);
+
+        if (gameMode != null)
+        {
+            // Doğrudan geçiş yaparak karmaşık manager takılmalarını önle
+            gameMode.SetMode(GameViewMode.BaseView, true);
+        }
+
+        if (enterBaseButton != null)
+            enterBaseButton.SetActive(false);
     }
 
     public void OnBackToMapPressed()
@@ -268,15 +283,7 @@ public class GameUI : MonoBehaviour
 
     public void OnHomeBasePressed()
     {
-        if (gameMode == null)
-            gameMode = FindAnyObjectByType<GameModeManager>();
-
-        WorldBaseMarker marker = WorldBaseMarker.FindPrimary(true);
-        if (worldBaseSelector != null && marker != null)
-            worldBaseSelector.SelectMarker(marker);
-
-        if (gameMode != null)
-            gameMode.FocusWorldCameraOnPlayerBase(true);
+        OnEnterBasePressed();
     }
 
     private void SetupModeButtons()
@@ -351,7 +358,7 @@ public class GameUI : MonoBehaviour
         bool isBaseMode = gameMode != null && gameMode.CurrentMode == GameViewMode.BaseView;
         bool hasSelectedWorldBase = worldBaseSelector != null && worldBaseSelector.selectedMarker != null;
 
-        if (enterBaseButton != null) enterBaseButton.SetActive(isWorldMode && hasSelectedWorldBase);
+        if (enterBaseButton != null) enterBaseButton.SetActive(false);
         if (backToMapButton != null) backToMapButton.SetActive(isBaseMode);
         if (homeBaseButton != null) homeBaseButton.SetActive(isWorldMode);
 
@@ -364,7 +371,7 @@ public class GameUI : MonoBehaviour
         if (existing != null)
         {
             Button eb = existing.GetComponent<Button>();
-            if (eb != null) { eb.onClick.RemoveListener(onClick); eb.onClick.AddListener(onClick); }
+            if (eb != null) { eb.onClick = new Button.ButtonClickedEvent(); eb.onClick.AddListener(onClick); }
             ConfigureButtonVisual(existing, label, anchor, anchoredPosition, size);
             return existing;
         }
@@ -376,6 +383,7 @@ public class GameUI : MonoBehaviour
         buttonObj.transform.SetParent(canvas.transform, false);
         ConfigureButtonVisual(buttonObj, label, anchor, anchoredPosition, size);
         Button b = buttonObj.GetComponent<Button>();
+        b.onClick = new Button.ButtonClickedEvent();
         b.onClick.AddListener(onClick);
         return buttonObj;
     }
@@ -407,11 +415,53 @@ public class GameUI : MonoBehaviour
     private Canvas FindScreenCanvas()
     {
         Canvas pc = GetComponentInParent<Canvas>();
-        if (pc != null && pc.renderMode != RenderMode.WorldSpace) return pc;
+        if (pc != null && pc.renderMode != RenderMode.WorldSpace)
+        {
+            EnsureGraphicRaycaster(pc);
+            return pc;
+        }
+
         Canvas[] canvases = FindObjectsByType<Canvas>(FindObjectsInactive.Exclude);
-        foreach (Canvas c in canvases) if (c != null && c.renderMode == RenderMode.ScreenSpaceOverlay) return c;
-        foreach (Canvas c in canvases) if (c != null && c.renderMode == RenderMode.ScreenSpaceCamera) return c;
+        foreach (Canvas c in canvases)
+        {
+            if (c != null && c.renderMode == RenderMode.ScreenSpaceOverlay)
+            {
+                EnsureGraphicRaycaster(c);
+                return c;
+            }
+        }
+
+        foreach (Canvas c in canvases)
+        {
+            if (c != null && c.renderMode == RenderMode.ScreenSpaceCamera)
+            {
+                EnsureGraphicRaycaster(c);
+                return c;
+            }
+        }
+
+        if (pc != null)
+            EnsureGraphicRaycaster(pc);
+
         return pc;
+    }
+
+    private void EnsureEventSystem()
+    {
+        if (EventSystem.current != null)
+            return;
+
+        GameObject eventSystemObject = new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
+        EventSystem.current = eventSystemObject.GetComponent<EventSystem>();
+    }
+
+    private void EnsureGraphicRaycaster(Canvas targetCanvas)
+    {
+        if (targetCanvas == null)
+            return;
+
+        if (targetCanvas.GetComponent<GraphicRaycaster>() == null)
+            targetCanvas.gameObject.AddComponent<GraphicRaycaster>();
     }
 }
 

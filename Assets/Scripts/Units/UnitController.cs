@@ -105,7 +105,7 @@ public HexCell currentHex;
         assembler.unitController = this;
         assembler.formationController = GetComponent<FormationController>();
 
-        if (unitData == null || unitData.visualProfile == null)
+        if (unitData == null)
         {
             SetChildrenActive(true);
             assembler.EnsureExistingChildrenVisible();

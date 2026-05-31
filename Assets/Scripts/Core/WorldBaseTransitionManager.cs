@@ -8,9 +8,9 @@ public class WorldBaseTransitionManager : MonoBehaviour
     public static WorldBaseTransitionManager Instance { get; private set; }
 
     [Header("Scene Loading")]
-    public bool useAsyncSceneLoading;
+    public bool useAsyncSceneLoading = false; // Kapalı: Sahne bazlı değil root bazlı geçiş yapılıyor
     public string worldSceneName = "WorldMap";
-    public string baseSceneName = "BaseScene";
+public string baseSceneName = "BaseScene";
     public bool unloadWorldSceneOnBase;
     public bool unloadBaseSceneOnWorld = true;
 

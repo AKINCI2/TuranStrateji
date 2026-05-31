@@ -16,6 +16,20 @@ public class TuranUnitData : ScriptableObject
     public WeaponData weaponData;
     public UnitVisualProfile visualProfile;
 
+    [Header("Model Baglantilari")]
+    [Tooltip("Bu birimin ana 3D modeli. Piyadede asker prefab, tankta tank prefab, topcuda obus/top prefab, roket bataryasinda roket araci prefab.")]
+    public GameObject unitModelPrefab;
+    [Tooltip("Geriye uyumluluk alani. Yeni model baglantisi icin Unit Model Prefab kullan.")]
+    public GameObject barracksSoldierPrefab;
+    [Tooltip("Haritaya cikarken farkli bir model kullanilacaksa buraya koy. Bos kalirsa Unit Model Prefab/worldPrefab sirasiyla kullanilir.")]
+    public GameObject deployedModelPrefab;
+
+    [Header("Kisla Gosterimi")]
+    [Range(1, 30)]
+    public int barracksVisibleSoldierCount = 6;
+    public int visibleSoldiersPerBarracksLevel = 2;
+    public float barracksSoldierSpacing = 0.32f;
+
     [Header("Classification")]
     public TuranForceBranch branch = TuranForceBranch.LandForces;
     public TuranUnitKind kind = TuranUnitKind.Infantry;
@@ -56,6 +70,12 @@ public class TuranUnitData : ScriptableObject
             oil = trainCostPerSoldier.oil * soldierCount,
             bor = trainCostPerSoldier.bor * soldierCount
         };
+    }
+
+    public int GetVisibleSoldierCountForBarracksLevel(int barracksLevel)
+    {
+        int levelBonus = Mathf.Max(0, barracksLevel - 1) * Mathf.Max(0, visibleSoldiersPerBarracksLevel);
+        return Mathf.Clamp(barracksVisibleSoldierCount + levelBonus, 1, 30);
     }
 }
 

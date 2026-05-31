@@ -17,9 +17,11 @@ public class BuildingPanelUI : MonoBehaviour
     public Button produceConcreteButton;
     public Button produceCementButton;
     public Button collectProductionButton;
+    public Button constructButton;
     public Button closeButton;
 
     private BaseBuilding selectedBuilding;
+    private BuildingSlot selectedSlot;
     private BuildingSelector selector;
     private PlayerProfileUI playerProfileUI;
     private BuildingSelector subscribedSelector;
@@ -65,6 +67,7 @@ public class BuildingPanelUI : MonoBehaviour
         HookButton(produceConcreteButton, OnProduceConcretePressed);
         HookButton(produceCementButton, OnProduceCementPressed);
         HookButton(collectProductionButton, OnCollectProductionPressed);
+        HookButton(constructButton, OnConstructPressed);
         HookButton(closeButton, ClosePanel);
 
         Hide();
@@ -89,15 +92,21 @@ public class BuildingPanelUI : MonoBehaviour
                 SubscribeSelector(selector);
         }
 
-        if (selector != null && selector.selectedBuilding != selectedBuilding)
+        if (selectedSlot == null && selector != null && selector.selectedBuilding != selectedBuilding)
             OnSelectionChanged(selector.selectedBuilding);
 
-        if (selectedBuilding != null)
+        if (selectedSlot == null && selectedBuilding != null)
             Refresh();
+        else if (selectedSlot != null)
+            RefreshSlot();
     }
 
     void OnSelectionChanged(BaseBuilding building)
     {
+        if (selectedSlot != null && building == null)
+            return;
+
+        selectedSlot = null;
         selectedBuilding = building;
 
         if (selectedBuilding == null)
@@ -122,6 +131,36 @@ public class BuildingPanelUI : MonoBehaviour
         if (panelRoot != null)
         {
             panelRoot.SetActive(building != null);
+            panelRoot.transform.SetAsLastSibling();
+            Canvas.ForceUpdateCanvases();
+        }
+    }
+
+    public void ForceSelectSlot(BuildingSlot slot)
+    {
+        Initialize();
+
+        if (panelRoot == null)
+            EnsurePanel();
+
+        selectedSlot = slot;
+        selectedBuilding = null;
+
+        if (selector != null)
+            selector.ClearSelection();
+
+        if (selectedSlot == null)
+        {
+            Hide();
+            return;
+        }
+
+        Show();
+        RefreshSlot();
+
+        if (panelRoot != null)
+        {
+            panelRoot.SetActive(true);
             panelRoot.transform.SetAsLastSibling();
             Canvas.ForceUpdateCanvases();
         }
@@ -202,6 +241,24 @@ public class BuildingPanelUI : MonoBehaviour
         Refresh();
     }
 
+    void OnConstructPressed()
+    {
+        if (selectedSlot == null || BaseConstructionManager.Instance == null)
+            return;
+
+        BuildingSlot slot = selectedSlot;
+        bool constructed = BaseConstructionManager.Instance.TryConstructAtSlot(slot);
+        slot.RefreshVisual();
+
+        if (constructed && slot.placedBuilding != null)
+        {
+            ForceSelectBuilding(slot.placedBuilding);
+            return;
+        }
+
+        RefreshSlot();
+    }
+
     void StartProduction(ConstructionMaterialType type)
     {
         if (!IsProductionBuilding() || ProductionFacilityManager.Instance == null)
@@ -216,6 +273,8 @@ public class BuildingPanelUI : MonoBehaviour
         if (selectedBuilding == null)
             return;
 
+        selectedSlot = null;
+        SetButtonVisible(constructButton, false, false);
         RefreshBarracksButtons();
         RefreshProductionButtons();
 
@@ -257,6 +316,55 @@ public class BuildingPanelUI : MonoBehaviour
             status = $"Komuta Merkezi Lv.{next.requiredHeadquartersLevel} gerekli";
 
         SetStatus(canUpgrade ? "Yukseltmeye hazir" : "Yukseltme yapilamaz", BuildDetailText(status), canUpgrade);
+    }
+
+    void RefreshSlot()
+    {
+        if (selectedSlot == null)
+            return;
+
+        HideBuildingActionButtons();
+
+        BaseConstructionManager construction = BaseConstructionManager.Instance;
+        ConstructionDefinition definition =
+            construction != null ? construction.GetDefinition(selectedSlot.allowedType) : null;
+
+        if (titleText != null)
+            titleText.text = selectedSlot.displayName;
+
+        int headquartersLevel =
+            BaseManager.Instance != null
+                ? BaseManager.Instance.HeadquartersLevel
+                : 1;
+
+        string reason = "";
+        bool canBuild =
+            construction != null &&
+            construction.CanConstructAtSlot(definition, selectedSlot, out reason);
+
+        string buildingName = definition != null ? definition.displayName : selectedSlot.allowedType.ToString();
+        string prefabStatus = definition != null && definition.prefab != null ? "Hazir" : "Model/prefab bekleniyor";
+        string lockStatus = selectedSlot.CanUse(headquartersLevel)
+            ? "Parsel acik"
+            : $"HQ Lv.{selectedSlot.requiredHeadquartersLevel} gerekli";
+
+        string detail =
+            $"Bina: {buildingName}\n" +
+            $"Parsel durumu: {lockStatus}\n" +
+            $"Model: {prefabStatus}\n" +
+            (definition != null && !string.IsNullOrWhiteSpace(definition.modelFolder)
+                ? $"Model klasoru: {definition.modelFolder}\n"
+                : "");
+
+        if (!canBuild && !string.IsNullOrWhiteSpace(reason))
+            detail += "Engel: " + reason;
+
+        SetStatus(canBuild ? "Insaata hazir" : "Insa edilemez", detail, false);
+
+        if (costText != null)
+            costText.text = definition != null ? "Maliyet  " + definition.cost.ToDisplayString() : "";
+
+        SetButtonVisible(constructButton, selectedSlot.IsEmpty, canBuild);
     }
 
     string BuildDetailText(string baseDetail)
@@ -317,12 +425,27 @@ public class BuildingPanelUI : MonoBehaviour
 
     void ClosePanel()
     {
+        selectedSlot = null;
         selectedBuilding = null;
 
         if (selector != null)
             selector.ClearSelection();
 
+        if (BuildingSlotSelector.Instance != null)
+            BuildingSlotSelector.Instance.ClearSelection();
+
         Hide();
+    }
+
+    void HideBuildingActionButtons()
+    {
+        SetUpgradeButtonVisible(false);
+        SetButtonVisible(deployButton, false, false);
+        SetButtonVisible(recallButton, false, false);
+        SetButtonVisible(produceWoodButton, false, false);
+        SetButtonVisible(produceConcreteButton, false, false);
+        SetButtonVisible(produceCementButton, false, false);
+        SetButtonVisible(collectProductionButton, false, false);
     }
 
     void SetUpgradeButtonVisible(bool visible)
@@ -445,6 +568,7 @@ public class BuildingPanelUI : MonoBehaviour
         produceConcreteButton = CreateButton("ProduceConcreteButton", "Beton", new Vector2(326f, -98f), new Vector2(110f, 28f));
         produceCementButton = CreateButton("ProduceCementButton", "Cimento", new Vector2(326f, -132f), new Vector2(110f, 28f));
         collectProductionButton = CreateButton("CollectProductionButton", "Topla", new Vector2(326f, -166f), new Vector2(110f, 28f));
+        constructButton = CreateButton("ConstructButton", "Insa Et", new Vector2(326f, -30f), new Vector2(110f, 28f));
         closeButton = CreateButton("CloseButton", "Kapat", new Vector2(326f, -200f), new Vector2(110f, 28f));
     }
 

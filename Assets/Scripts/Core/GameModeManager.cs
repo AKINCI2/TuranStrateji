@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -196,29 +196,21 @@ public class GameModeManager : MonoBehaviour
         Vector3 target = marker.transform.position;
         Vector3 direction = worldCameraOffset.normalized;
         if (direction == Vector3.zero)
-            direction = new Vector3(0f, 0.78f, -0.62f).normalized;
+            direction = new Vector3(0f, 0.72f, -0.68f).normalized;
 
         float footprint = grid != null ? Mathf.Max(GetWorldHexFootprint(), grid.size) : 1.7f;
         float distance = closeView
-            ? Mathf.Clamp(footprint * 13f, 18f, 28f)
-            : Mathf.Clamp(footprint * 24f, 34f, 52f);
+            ? Mathf.Clamp(footprint * 11f, 15f, 22f)
+            : Mathf.Clamp(footprint * 22f, 32f, 48f);
 
         Vector3 cameraPosition = target + direction * distance;
-
-        if (grid != null)
-            ConfigureCameraWorldBounds(grid, cameraPosition);
-        else
-            worldCameraAnchor.position = cameraPosition;
-
-        cameraPosition = worldCameraAnchor != null ? worldCameraAnchor.position : cameraPosition;
-        Quaternion rotation = Quaternion.LookRotation(target - cameraPosition, Vector3.up);
-
+        
+        // Kamera hedefini doğrudan ata
         targetCamPos = cameraPosition;
-        targetCamRot = rotation;
+        targetCamRot = Quaternion.LookRotation(target - cameraPosition, Vector3.up);
         hasCameraTarget = true;
         cameraTransitionActive = true;
         cameraTransitionTimer = 0f;
-        ApplyCameraFieldOfView(GameViewMode.WorldMap);
     }
 
     public void EnterWorldMap(bool preserveCameraFrame)
@@ -312,8 +304,25 @@ public class GameModeManager : MonoBehaviour
                 mainCamera.transform.rotation = targetCamRot;
                 cameraTransitionActive = false;
                 cameraTransitionTimer = 0f;
+
+                // Sync CameraController's targetPos to prevent snap-back shake
+                CameraController camCtrl = mainCamera.GetComponent<CameraController>();
+                if (camCtrl != null)
+                {
+                    if (baseOn)
+                    {
+                        camCtrl.lockBasePanToCenter = false;
+                        camCtrl.baseMinY = Mathf.Min(camCtrl.baseMinY, 3.2f);
+                        camCtrl.baseMaxY = Mathf.Max(camCtrl.baseMaxY, 24f);
+                        camCtrl.basePanRadius = Mathf.Max(camCtrl.basePanRadius, GetBaseFootprintSize() * 0.55f);
+                    }
+
+                    // Accessing private field via reflection safely
+                    var field = typeof(CameraController).GetField("targetPos", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    if (field != null) field.SetValue(camCtrl, targetCamPos);
+                }
             }
-        }
+}
         else
         {
             // Anchor yoksa kamerayÄ± olduÄŸu yerde bÄ±rak.
@@ -375,24 +384,24 @@ public class GameModeManager : MonoBehaviour
         headquartersBasePosition = new Vector3(0f, 0f, 1.35f);
         barracksBasePosition = new Vector3(-1.9f, 0f, -1.45f);
         productionBasePosition = new Vector3(1.9f, 0f, -1.45f);
-        baseInteriorHexFillRatio = Mathf.Clamp(baseInteriorHexFillRatio, 1.18f, 1.45f);
+        baseInteriorHexFillRatio = Mathf.Clamp(baseInteriorHexFillRatio, 7.8f, 9.6f);
 
-        baseCameraHeightPadding = Mathf.Clamp(baseCameraHeightPadding, 1.85f, 2.45f);
+        baseCameraHeightPadding = Mathf.Clamp(baseCameraHeightPadding, 1.25f, 1.65f);
 
-        minBaseCameraDistance = Mathf.Clamp(minBaseCameraDistance, 4.2f, 6.2f);
+        minBaseCameraDistance = Mathf.Clamp(minBaseCameraDistance, 14f, 18f);
 
-        maxBaseCameraDistance = Mathf.Clamp(maxBaseCameraDistance, 9f, 16f);
-        if (maxBaseCameraDistance < minBaseCameraDistance + 2.4f)
-            maxBaseCameraDistance = minBaseCameraDistance + 2.4f;
+        maxBaseCameraDistance = Mathf.Clamp(maxBaseCameraDistance, 24f, 34f);
+        if (maxBaseCameraDistance < minBaseCameraDistance + 6f)
+            maxBaseCameraDistance = minBaseCameraDistance + 6f;
 
-        baseCameraFieldOfView = Mathf.Clamp(baseCameraFieldOfView, 38f, 44f);
+        baseCameraFieldOfView = Mathf.Clamp(baseCameraFieldOfView, 44f, 50f);
         worldCameraFieldOfView = Mathf.Clamp(worldCameraFieldOfView, 50f, 56f);
 
         if (worldCameraOffset.magnitude < 20f || worldCameraOffset.magnitude > 70f)
             worldCameraOffset = new Vector3(0f, 42f, -34f);
 
-        if (baseCameraOffset.magnitude < 2.6f || baseCameraOffset.magnitude > 10f)
-            baseCameraOffset = new Vector3(0f, 5.2f, -4.7f);
+        if (baseCameraOffset.magnitude < 18f || baseCameraOffset.magnitude > 40f)
+            baseCameraOffset = new Vector3(0f, 22f, -24f);
     }
 
     private void EnsureCameraAnchors()
@@ -471,18 +480,21 @@ public class GameModeManager : MonoBehaviour
         if (baseCameraAnchor == null)
             baseCameraAnchor = CreateAnchor("BaseCameraAnchor_Auto", Vector3.zero, Quaternion.identity);
 
-        Bounds bounds = GetBaseContentBounds();
-        Vector3 center = bounds.center;
-        float footprint = Mathf.Max(bounds.size.x, bounds.size.z);
+        Bounds contentBounds = GetBaseContentBounds();
+        Vector3 center = contentBounds.center;
+        if (baseRoot != null)
+            center.y = baseRoot.transform.position.y + 0.2f;
+
+        float footprint = Mathf.Max(GetBaseFootprintSize(), 12f);
         float distance = Mathf.Clamp(
-            footprint * baseCameraHeightPadding,
+            footprint * 1.26f,
             minBaseCameraDistance,
             maxBaseCameraDistance
         );
 
-        Vector3 direction = baseCameraOffset.normalized;
+        Vector3 direction = new Vector3(0f, 0.78f, -0.62f).normalized;
         if (direction == Vector3.zero)
-            direction = new Vector3(-0.45f, 0.72f, -0.45f).normalized;
+            direction = new Vector3(0f, 0.68f, -0.74f).normalized;
 
         Vector3 cameraPos = center + direction * distance;
 
@@ -634,7 +646,7 @@ public class GameModeManager : MonoBehaviour
             return;
 
         Bounds bounds = GetHexGridBounds(grid);
-        float pad = -Mathf.Max(14f, GetWorldHexFootprint() * 9f);
+        float pad = 28f; // Use a larger inward padding to strictly hide map edges
         controller.SetWorldBounds(bounds, pad);
 
         Vector3 clamped = controller.ClampWorldPosition(cameraPosition);
@@ -672,10 +684,8 @@ public class GameModeManager : MonoBehaviour
         if (!hasCells)
             return GetRootBounds(grid.gameObject);
 
-        float expand = Mathf.Max(4f, GetWorldHexFootprint() * 2f);
-        bounds.Expand(new Vector3(expand, 0f, expand));
         return bounds;
-    }
+        }
 
     private Bounds GetBaseContentBounds()
     {
@@ -787,7 +797,7 @@ public class GameModeManager : MonoBehaviour
     private float GetBaseFootprintSize()
     {
         float oneHexFootprint = GetWorldHexFootprint();
-        return Mathf.Max(3.2f, oneHexFootprint * baseInteriorHexFillRatio * GetBaseExpansionStage());
+        return Mathf.Max(16.5f, oneHexFootprint * baseInteriorHexFillRatio * GetBaseExpansionStage());
     }
 
     public float GetCurrentBaseFootprintSize()
@@ -810,15 +820,15 @@ public class GameModeManager : MonoBehaviour
         float footprint = GetBaseFootprintSize();
 
         if (type == BuildingType.Headquarters)
-            return Mathf.Clamp(footprint * 0.56f, 1.35f, 3.2f);
+            return Mathf.Clamp(footprint * 0.58f, 8.5f, 12.0f);
 
         if (type == BuildingType.Barracks)
-            return Mathf.Clamp(footprint * 0.24f, 0.72f, 1.25f);
+            return Mathf.Clamp(footprint * 0.22f, 3.0f, 4.2f);
 
         if (type == BuildingType.ProductionFacility)
-            return Mathf.Clamp(footprint * 0.28f, 0.78f, 1.45f);
+            return Mathf.Clamp(footprint * 0.23f, 3.0f, 4.4f);
 
-        return Mathf.Clamp(footprint * 0.38f, 0.48f, 1.7f);
+        return Mathf.Clamp(footprint * 0.22f, 2.4f, 4.0f);
     }
 
     public float GetSuggestedBaseUnitScale()

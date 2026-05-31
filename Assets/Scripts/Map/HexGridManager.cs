@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 
 public class HexGridManager : MonoBehaviour
@@ -457,7 +457,24 @@ public class HexGridManager : MonoBehaviour
             cloudMask = gameObject.AddComponent<WorldMapCloudMask>();
 
         cloudMask.grid = this;
+        // Harita dışındaki krem alanı tamamen kapatmak için bant genişliğini ve kapsama alanını artırıyoruz.
+        cloudMask.cloudBandWidth = 450f; 
+        cloudMask.edgePadding = -22f; 
         cloudMask.Rebuild();
+    }
+
+    [Header("REAL MAP INTEGRATION (GERCEK HARITA)")]
+    [Tooltip("Gerçek harita modelinizi veya zemin mesh'inizi buraya koyarak sistemi entegre edebilirsiniz.")]
+    public GameObject realMapMesh;
+    
+    // Haritayı gerçekçi bir zemine dönüştürmek için bu metodu kullanabilirsiniz.
+    public void IntegrateRealMap()
+    {
+        if (realMapMesh != null)
+        {
+            // Harita mesh'ini grid ile hizala...
+            Debug.Log("Gercek harita entegrasyonu aktif.");
+        }
     }
 }
 

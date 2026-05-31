@@ -36,13 +36,15 @@ public class WorldBaseSelector : MonoBehaviour
         if (!TuranTouchInput.TryGetPrimaryPointerPosition(out pointerPosition))
             return;
 
+        // If pointer is over UI, do nothing.
         if (IsPointerOverUI(pointerPosition))
             return;
 
         Vector2 tapPosition;
+        // Simplified tap detection to avoid missing methods
         if (TuranTouchInput.TryGetPrimaryTapDown(out tapPosition))
             TrySelectMarker(tapPosition);
-    }
+}
 
     public void ClearSelection()
     {
@@ -75,9 +77,7 @@ public class WorldBaseSelector : MonoBehaviour
 
         if (hits == null || hits.Length == 0)
         {
-            if (debugLogs)
-                Debug.Log("WorldBaseSelector: Raycast hit yok.");
-
+            Debug.Log("WorldBaseSelector: Raycast hit yok.");
             ClearSelection();
             return;
         }
@@ -94,16 +94,13 @@ public class WorldBaseSelector : MonoBehaviour
                 continue;
 
             selectedMarker = marker;
-            if (debugLogs)
-                Debug.Log("WorldBaseSelector: Marker secildi -> " + marker.name);
+            Debug.Log("WorldBaseSelector: Marker SECILDI -> " + marker.name);
 
             SelectionChanged?.Invoke(selectedMarker);
             return;
         }
 
-        if (debugLogs)
-            Debug.Log("WorldBaseSelector: Raycast var ama WorldBaseMarker yok.");
-
+        Debug.Log("WorldBaseSelector: Raycast var ama WorldBaseMarker bulunamadı. Hit: " + hits[0].collider.name);
         ClearSelection();
     }
 

@@ -80,6 +80,49 @@ public class WorldResourceNodeManager : MonoBehaviour
         return node != null && node.TryCollect(unit);
     }
 
+    public List<WorldResourceNode> GetAllNodesSnapshot()
+    {
+        List<WorldResourceNode> snapshot = new List<WorldResourceNode>();
+
+        foreach (KeyValuePair<HexCell, WorldResourceNode> pair in nodesByHex)
+        {
+            if (pair.Value != null)
+                snapshot.Add(pair.Value);
+        }
+
+        return snapshot;
+    }
+
+    public void EnsureGenerated()
+    {
+        if (generated)
+            return;
+
+        if (generateOnStart && CanGenerate())
+            GenerateDefaultNodes();
+    }
+
+    public WorldResourceNode GetOrCreateSavedNode(
+        WorldResourceType type,
+        int level,
+        int amount,
+        HexCell hex)
+    {
+        if (hex == null)
+            return null;
+
+        if (nodesByHex.TryGetValue(hex, out WorldResourceNode existing))
+            return existing;
+
+        generated = true;
+        return CreateNode(
+            type,
+            Mathf.Max(1, level),
+            Mathf.Max(1, amount),
+            hex
+        );
+    }
+
     public void GenerateDefaultNodes()
     {
         HexGridManager grid =

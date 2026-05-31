@@ -6,13 +6,20 @@ public class Health : MonoBehaviour
     public int maxHealth = 100;
     public bool debugLogs = false;
 
+    [Header("Feedback")]
+    public bool enableHitFeedback = true;
+    public float hitPulseScale = 1.06f;
+    public float hitPulseSeconds = 0.08f;
+
     public int currentHealth;
 
     private int lastSoldierCount;
+    private bool currentHealthRestored;
+    private Coroutine hitFeedbackRoutine;
 
     void Start()
     {
-        ApplyStatsFromData(true);
+        ApplyStatsFromData(!currentHealthRestored);
 
         FormationController formation =
             GetComponent<FormationController>();
@@ -56,14 +63,51 @@ public class Health : MonoBehaviour
             currentHealth = Mathf.Clamp(Mathf.RoundToInt(maxHealth * healthRatio), 1, maxHealth);
     }
 
+    public void SetCurrentHealth(int value)
+    {
+        currentHealth = Mathf.Clamp(value, 0, maxHealth);
+        currentHealthRestored = true;
+        SyncFormationToHealth();
+    }
+
+    private void SyncFormationToHealth()
+    {
+        FormationController formation =
+            GetComponent<FormationController>();
+
+        if (formation == null)
+            return;
+
+        formation.RebuildSoldiersFromChildren(true);
+
+        int currentSoldierCount =
+            Mathf.Clamp(
+                Mathf.CeilToInt(
+                    (float)currentHealth /
+                    Mathf.Max(1, maxHealth) *
+                    formation.maxSoldiers
+                ),
+                0,
+                formation.maxSoldiers
+            );
+
+        formation.SetVisibleSoldierCount(currentSoldierCount);
+        lastSoldierCount = currentSoldierCount;
+    }
+
     // =================================================
     // DAMAGE
     // =================================================
 
     public void TakeDamage(float damage)
     {
+        if (damage <= 0f)
+            return;
+
         currentHealth -=
             Mathf.RoundToInt(damage);
+
+        PlayHitFeedback();
 
         if (debugLogs)
         {
@@ -125,5 +169,44 @@ public class Health : MonoBehaviour
             Destroy(gameObject, 4f);
         }
     }
-}
 
+    private void PlayHitFeedback()
+    {
+        if (!enableHitFeedback || !gameObject.activeInHierarchy)
+            return;
+
+        if (hitFeedbackRoutine != null)
+            StopCoroutine(hitFeedbackRoutine);
+
+        hitFeedbackRoutine = StartCoroutine(HitFeedbackRoutine());
+    }
+
+    private System.Collections.IEnumerator HitFeedbackRoutine()
+    {
+        Vector3 originalScale = transform.localScale;
+        Vector3 targetScale = originalScale * Mathf.Max(1f, hitPulseScale);
+        float duration = Mathf.Max(0.02f, hitPulseSeconds);
+        float halfDuration = duration * 0.5f;
+        float elapsed = 0f;
+
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / halfDuration);
+            transform.localScale = Vector3.Lerp(originalScale, targetScale, t);
+            yield return null;
+        }
+
+        elapsed = 0f;
+        while (elapsed < halfDuration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / halfDuration);
+            transform.localScale = Vector3.Lerp(targetScale, originalScale, t);
+            yield return null;
+        }
+
+        transform.localScale = originalScale;
+        hitFeedbackRoutine = null;
+    }
+}

@@ -112,6 +112,12 @@ public class BaseManager : MonoBehaviour
 
         foreach (BaseBuilding building in sceneBuildings)
         {
+            if (building == null || building.data == null)
+                continue;
+
+            if (building.data.type != BuildingType.Headquarters)
+                continue;
+
             RegisterBuilding(building);
         }
     }
